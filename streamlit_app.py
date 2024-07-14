@@ -16,6 +16,7 @@ def get_data(url):
     df['geracao'] = df['geracao'] / 60  # Convertendo de MWh para MW
     
     return df
+
 st.set_page_config(layout="wide")
     
 # Geração do SIN
