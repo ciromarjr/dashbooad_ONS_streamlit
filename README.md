@@ -14,7 +14,7 @@ Clone este repositório:
 
 bash
 Copiar código
-git clone https://github.com/seu-usuario/nome-do-repositorio.git
+git clone 
 cd nome-do-repositorio
 Instale as dependências:
 
