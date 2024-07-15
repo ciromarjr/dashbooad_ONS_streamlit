@@ -102,10 +102,8 @@ fig_rosca = go.Figure(data=[go.Pie(
     labels=[f'{row["Fonte"]}<br>{row["Geração (MW)"]:.2f} MW' for _, row in df_total_geracao.iterrows()], 
     values=df_total_geracao['Geração (MW)'], 
     hole=.5
-    hoverinfo='label+percent+value'
-    annotations=[dict(text=f'{total_sin_gwh:.2f} GW', x=0.5, y=0.5, font_size=20, showarrow=False)],
-        margin=dict(t=0, b=0, l=0, r=0),  # Remover margens para aproveitar melhor o espaço
-        height=600,  # Aumentar a altura do gráfico
+    
+    
 )])
 
 # Adicionar anotação no centro do gráfico
@@ -122,7 +120,10 @@ fig_rosca.add_annotation(
 # Configurar layout do gráfico
 fig_rosca.update_layout(
     title_text='Cenário de Geração do SIN',
-    annotations=[dict(text=f'{total_sin_gwh:.2f} GW', x=0.5, y=0.5, font_size=20, showarrow=False)]
+    hoverinfo='label+percent+value'
+    annotations=[dict(text=f'{total_sin_gwh:.2f} GW', x=0.5, y=0.5, font_size=20, showarrow=False)],
+        margin=dict(t=0, b=0, l=0, r=0),  # Remover margens para aproveitar melhor o espaço
+        height=600,  # Aumentar a altura do gráfico
 )
 
 # Exibir o gráfico na aplicação Streamlit
