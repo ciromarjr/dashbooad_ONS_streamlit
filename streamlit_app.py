@@ -128,7 +128,7 @@ col1.plotly_chart(fig_rosca, use_container_width=True)
 # Geração do SIN em um único gráfico
 col2.subheader('Geração do SIN')
 fig_sin = px.line(df_eolica, x='instante', y='geracao', color_discrete_sequence=['blue'], labels={'geracao': 'Geração (MW)'})
-fig_sin.add_scatter(x=df_total_geracao['instante'], y=df_total_geracao['geracao'], mode='lines', line=dict(color='white'), name='Total')
+#fig_sin.add_scatter(x=df_total_geracao['instante'], y=df_total_geracao['geracao'], mode='lines', line=dict(color='white'), name='Total')
 fig_sin.add_scatter(x=df_eolica['instante'], y=df_eolica['geracao'], mode='lines', line=dict(color='blue'), name='Eólica')
 fig_sin.add_scatter(x=df_solar['instante'], y=df_solar['geracao'], mode='lines', line=dict(color='green'), name='Solar')
 fig_sin.add_scatter(x=df_hidraulica['instante'], y=df_hidraulica['geracao'], mode='lines', line=dict(color='orange'), name='Hidráulica')
