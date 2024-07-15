@@ -32,7 +32,7 @@ Contribuições
 Contribuições são bem-vindas! Para alterações importantes, por favor, abra um problema para discutir o que você gostaria de mudar.
 
 Licença
-Este projeto está licenciado sob a Licença MIT - veja o arquivo LICENSE para mais detalhes.
+Este projeto está licenciado sob a Licença ONS.
 
 Notas Adicionais
 Dashboard em Tempo Real: Os dados são atualizados automaticamente conforme disponibilidade da API do ONS.
