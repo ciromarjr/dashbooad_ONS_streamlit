@@ -3,6 +3,8 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
+import time
+
 
 # Função para obter dados e cachear por 60 segundos
 @st.cache_data(ttl=20)
@@ -78,7 +80,6 @@ urls = {
 }
 
 
-
 # Exibir a última atualização
 st.write(f"Última atualização: {ultima_atualizacao.strftime('%d-%m-%Y %H:%M')}")
 
@@ -98,7 +99,7 @@ df_total_geracao = pd.DataFrame({
 
 # Criar gráfico de rosca
 fig_rosca = go.Figure(data=[go.Pie(
-    labels=df_total_geracao['Fonte'], 
+    labels=[f'{row["Fonte"]}<br>{row["Geração (MW)"]:.2f} MW' for _, row in df_total_geracao.iterrows()], 
     values=df_total_geracao['Geração (MW)'], 
     hole=.6,
     hoverinfo='label+percent+value'
@@ -122,8 +123,6 @@ fig_rosca.update_layout(
 )
 
 # Exibir o gráfico na aplicação Streamlit
-
-col1.subheader('Cenário de Geração do SIN')
 col1.plotly_chart(fig_rosca, use_container_width=True)
 
 # Geração do SIN em um único gráfico
@@ -149,5 +148,6 @@ fig_regiao.add_scatter(x=df_sul_eolica['instante'], y=df_sul_eolica['geracao'], 
 fig_regiao.add_scatter(x=df_sul_solar['instante'], y=df_sul_solar['geracao'], mode='lines', line=dict(color='gray'), name='Solar Sul')
 st.plotly_chart(fig_regiao, use_container_width=True)
 
-
-
+# Pausar por 60 segundos antes da próxima atualização
+time.sleep(60)
+st.experimental_rerun()
