@@ -3,6 +3,8 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
+import time
+
 
 # Função para obter dados e cachear por 60 segundos
 @st.cache_data(ttl=20)
@@ -78,7 +80,6 @@ urls = {
 }
 
 
-
 # Exibir a última atualização
 st.write(f"Última atualização: {ultima_atualizacao.strftime('%d-%m-%Y %H:%M')}")
 
@@ -98,7 +99,7 @@ df_total_geracao = pd.DataFrame({
 
 # Criar gráfico de rosca
 fig_rosca = go.Figure(data=[go.Pie(
-    labels=df_total_geracao['Fonte'], 
+    labels=[f'{row["Fonte"]}<br>{row["Geração (MW)"]:.2f} MW' for _, row in df_total_geracao.iterrows()], 
     values=df_total_geracao['Geração (MW)'], 
     hole=.6,
     hoverinfo='label+percent+value'
@@ -118,17 +119,16 @@ fig_rosca.add_annotation(
 # Configurar layout do gráfico
 fig_rosca.update_layout(
     title_text='Cenário de Geração do SIN',
-    annotations=[dict(text=f'{total_sin_gwh:.2f} GWh', x=0.5, y=0.5, font_size=20, showarrow=False)]
+    annotations=[dict(text=f'{total_sin_gwh:.2f} GW', x=0.5, y=0.5, font_size=20, showarrow=False)]
 )
 
 # Exibir o gráfico na aplicação Streamlit
-
-col1.subheader('Cenário de Geração do SIN')
 col1.plotly_chart(fig_rosca, use_container_width=True)
 
 # Geração do SIN em um único gráfico
 col2.subheader('Geração do SIN')
 fig_sin = px.line(df_eolica, x='instante', y='geracao', color_discrete_sequence=['blue'], labels={'geracao': 'Geração (MW)'})
+#fig_sin.add_scatter(x=df_total_geracao['instante'], y=df_total_geracao['geracao'], mode='lines', line=dict(color='white'), name='Total')
 fig_sin.add_scatter(x=df_eolica['instante'], y=df_eolica['geracao'], mode='lines', line=dict(color='blue'), name='Eólica')
 fig_sin.add_scatter(x=df_solar['instante'], y=df_solar['geracao'], mode='lines', line=dict(color='green'), name='Solar')
 fig_sin.add_scatter(x=df_hidraulica['instante'], y=df_hidraulica['geracao'], mode='lines', line=dict(color='orange'), name='Hidráulica')
@@ -148,3 +148,7 @@ fig_regiao.add_scatter(x=df_sudeste_e_centro_oeste_solar['instante'], y=df_sudes
 fig_regiao.add_scatter(x=df_sul_eolica['instante'], y=df_sul_eolica['geracao'], mode='lines', line=dict(color='pink'), name='Eólica Sul')
 fig_regiao.add_scatter(x=df_sul_solar['instante'], y=df_sul_solar['geracao'], mode='lines', line=dict(color='gray'), name='Solar Sul')
 st.plotly_chart(fig_regiao, use_container_width=True)
+
+# Pausar por 60 segundos antes da próxima atualização
+time.sleep(60)
+st.experimental_rerun()
