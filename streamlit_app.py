@@ -92,8 +92,8 @@ dataframes = {key: get_data(url) for key, url in urls.items()}
 total_sin_gwh = sum(df['geracao'].iloc[-1] * 60 for df in dataframes.values()) / 1_000  # Convertendo de MWh para GWh
 
 # Preparar dados para o gráfico de rosca
- df_total_geracao = pd.DataFrame({
-    'Fonte': list(urls.keys()),
+df_total_geracao = pd.DataFrame({
+   'Fonte': list(urls.keys()),
     'Geração (MW)': [df['geracao'].iloc[-1] for df in dataframes.values()]
     })
 
