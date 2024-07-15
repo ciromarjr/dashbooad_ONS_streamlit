@@ -92,43 +92,41 @@ dataframes = {key: get_data(url) for key, url in urls.items()}
 total_sin_gwh = sum(df['geracao'].iloc[-1] * 60 for df in dataframes.values()) / 1_000  # Convertendo de MWh para GWh
 
 # Preparar dados para o gráfico de rosca
-df_total_geracao = pd.DataFrame({
-    'Fonte': list(urls.keys()),
-    'Geração (MW)': [df['geracao'].iloc[-1] for df in dataframes.values()]
-})
+    df_total_geracao = pd.DataFrame({
+        'Fonte': list(urls.keys()),
+        'Geração (MW)': [df['geracao'].iloc[-1] for df in dataframes.values()]
+    })
 
-# Criar gráfico de rosca
-fig_rosca = go.Figure(data=[go.Pie(
-    labels=[f'{row["Fonte"]}<br>{row["Geração (MW)"]:.2f} MW' for _, row in df_total_geracao.iterrows()], 
-    values=df_total_geracao['Geração (MW)'], 
-    hole=.5,
-    hoverinfo='label+percent+value'
-    
-    
-)])
+    # Criar gráfico de rosca
+    fig_rosca = go.Figure(data=[go.Pie(
+        labels=[f'{row["Fonte"]}<br>{row["Geração (MW)"]:.2f} MW' for _, row in df_total_geracao.iterrows()], 
+        values=df_total_geracao['Geração (MW)'], 
+        hole=.6,
+        hoverinfo='label+percent+value'
+    )])
 
-# Adicionar anotação no centro do gráfico
-fig_rosca.add_annotation(
-    dict(
-        text=f'{total_sin_gwh:.2f} GW',
-        x=0.5,
-        y=0.5,
-        font_size=20,
-        showarrow=False
+    # Adicionar anotação no centro do gráfico
+    fig_rosca.add_annotation(
+        dict(
+            text=f'{total_sin_gwh:.2f} GW',
+            x=0.5,
+            y=0.5,
+            font_size=500000,
+            showarrow=False
+        )
     )
-)
 
-# Configurar layout do gráfico
-fig_rosca.update_layout(
-    title_text='Cenário de Geração do SIN',
-    hoverinfo='label+percent+value'
-    annotations=[dict(text=f'{total_sin_gwh:.2f} GW', x=0.5, y=0.5, font_size=20, showarrow=False)],
-    margin=dict(t=0, b=0, l=0, r=0),  # Remover margens para aproveitar melhor o espaço
-    height=600,  # Aumentar a altura do gráfico
-)
+    # Configurar layout do gráfico
+    fig_rosca.update_layout(
+        title_text='Cenário de Geração do SIN',
+        annotations=[dict(text=f'{total_sin_gwh:.2f} GW', x=0.5, y=0.5, font_size=20, showarrow=False)],
+        margin=dict(t=0, b=0, l=0, r=0),  # Remover margens para aproveitar melhor o espaço
+        height=600,  # Aumentar a altura do gráfico
+    )
 
-# Exibir o gráfico na aplicação Streamlit
-col1.plotly_chart(fig_rosca, use_container_width=True)
+    # Exibir o gráfico na aplicação Streamlit
+    col1.plotly_chart(fig_rosca, use_container_width=True)
+
 
 # Geração do SIN em um único gráfico
 col2.subheader('Geração do SIN')
