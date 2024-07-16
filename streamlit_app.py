@@ -1,8 +1,8 @@
 import requests
 import streamlit as st
 import pandas as pd
-import plotly.express as px
 import plotly.graph_objects as go
+import plotly.figure_factory as ff
 from datetime import datetime
 import time
 
@@ -59,10 +59,10 @@ def create_charts(dataframes):
     # Adicionar anotação no centro do gráfico
     fig_rosca.add_annotation(
         dict(
-            text=f'{total_sin_gwh:.2f} GW',
+            text=f'{total_sin_gwh:.2f} GWh',
             x=0.5,
             y=0.5,
-            font_size=900,  # Aumentar o tamanho do texto
+            font_size=30,
             showarrow=False
         )
     )
@@ -70,27 +70,41 @@ def create_charts(dataframes):
     # Configurar layout do gráfico
     fig_rosca.update_layout(
         title_text='Cenário de Geração do SIN',
-        annotations=[dict(text=f'{total_sin_gwh:.2f} GW', x=0.5, y=0.5, font_size=70, showarrow=False)],
-        height=900,  # Aumentar a altura do gráfico
-        width=900,    # Aumentar a largura do gráfico
-        legend=dict(font=dict(size=30))  # Aumentar o tamanho do texto da legenda
+        annotations=[dict(text=f'{total_sin_gwh:.2f} GWh', x=0.5, y=0.5, font_size=30, showarrow=False)],
+        height=700,
+        width=700,
+        legend=dict(
+            font=dict(size=16),
+            title="Fontes de Energia"
+        ),
+        margin=dict(t=50, b=50, l=50, r=50),
+        paper_bgcolor='rgba(0,0,0,0)',
+        plot_bgcolor='rgba(0,0,0,0)'
     )
 
     # Função para adicionar a linha total de geração
     def add_total_line(fig, dataframes, name):
         df_total = pd.DataFrame(index=dataframes[list(dataframes.keys())[0]]['instante'])
         df_total['total'] = sum(df.set_index('instante')['geracao'] for df in dataframes.values())
-        fig.add_scatter(x=df_total.index, y=df_total['total'], mode='lines', line=dict(color='white', dash='dash'), name=name)
+        fig.add_trace(go.Scatter(x=df_total.index, y=df_total['total'], mode='lines', line=dict(color='black', dash='dash'), name=name))
 
     # Geração do SIN em um único gráfico
-    fig_sin = px.line(dataframes['Eólica'], x='instante', y='geracao', color_discrete_sequence=['blue'], labels={'geracao': 'Geração (MW)'})
-    fig_sin.add_scatter(x=dataframes['Eólica']['instante'], y=dataframes['Eólica']['geracao'], mode='lines', line=dict(color='blue'), name='Eólica')
-    fig_sin.add_scatter(x=dataframes['Solar']['instante'], y=dataframes['Solar']['geracao'], mode='lines', line=dict(color='green'), name='Solar')
-    fig_sin.add_scatter(x=dataframes['Hidráulica']['instante'], y=dataframes['Hidráulica']['geracao'], mode='lines', line=dict(color='orange'), name='Hidráulica')
-    fig_sin.add_scatter(x=dataframes['Nuclear']['instante'], y=dataframes['Nuclear']['geracao'], mode='lines', line=dict(color='red'), name='Nuclear')
-    fig_sin.add_scatter(x=dataframes['Térmica']['instante'], y=dataframes['Térmica']['geracao'], mode='lines', line=dict(color='purple'), name='Térmica')
+    fig_sin = go.Figure()
+    for fonte, df in dataframes.items():
+        fig_sin.add_trace(go.Scatter(x=df['instante'], y=df['geracao'], mode='lines', name=fonte))
+
     add_total_line(fig_sin, dataframes, 'Total')
-    fig_sin.update_layout(legend=dict(font=dict(size=20)))  # Aumentar o tamanho do texto da legenda
+
+    fig_sin.update_layout(
+        legend=dict(font=dict(size=16)),
+        title='Geração do SIN',
+        xaxis_title='Instante',
+        yaxis_title='Geração (MW)',
+        margin=dict(t=50, b=50, l=50, r=50),
+        paper_bgcolor='rgba(0,0,0,0)',
+        plot_bgcolor='rgba(0,0,0,0)'
+    )
+
     # Geração por Região em um único gráfico
     df_region_dataframes = {
         'Eólica Norte': get_data("https://integra.ons.org.br/api/energiaagora/Get/Geracao_Norte_Eolica_json"),
@@ -103,42 +117,56 @@ def create_charts(dataframes):
         'Solar Sul': get_data("https://integra.ons.org.br/api/energiaagora/Get/Geracao_Sul_Solar_json")
     }
 
-    fig_regiao = px.line(df_region_dataframes['Eólica Norte'], x='instante', y='geracao', color_discrete_sequence=['blue'], labels={'geracao': 'Geração (MW)'})
-    fig_regiao.add_scatter(x=df_region_dataframes['Eólica Norte']['instante'], y=df_region_dataframes['Eólica Norte']['geracao'], mode='lines', line=dict(color='blue'), name='Eólica Norte')
-    fig_regiao.add_scatter(x=df_region_dataframes['Solar Norte']['instante'], y=df_region_dataframes['Solar Norte']['geracao'], mode='lines', line=dict(color='green'), name='Solar Norte')
-    fig_regiao.add_scatter(x=df_region_dataframes['Eólica Nordeste']['instante'], y=df_region_dataframes['Eólica Nordeste']['geracao'], mode='lines', line=dict(color='orange'), name='Eólica Nordeste')
-    fig_regiao.add_scatter(x=df_region_dataframes['Solar Nordeste']['instante'], y=df_region_dataframes['Solar Nordeste']['geracao'], mode='lines', line=dict(color='red'), name='Solar Nordeste')
-    fig_regiao.add_scatter(x=df_region_dataframes['Eólica Sudeste/Centro-Oeste']['instante'], y=df_region_dataframes['Eólica Sudeste/Centro-Oeste']['geracao'], mode='lines', line=dict(color='purple'), name='Eólica Sudeste/Centro-Oeste')
-    fig_regiao.add_scatter(x=df_region_dataframes['Solar Sudeste/Centro-Oeste']['instante'], y=df_region_dataframes['Solar Sudeste/Centro-Oeste']['geracao'], mode='lines', line=dict(color='brown'), name='Solar Sudeste/Centro-Oeste')
-    fig_regiao.add_scatter(x=df_region_dataframes['Eólica Sul']['instante'], y=df_region_dataframes['Eólica Sul']['geracao'], mode='lines', line=dict(color='pink'), name='Eólica Sul')
-    fig_regiao.add_scatter(x=df_region_dataframes['Solar Sul']['instante'], y=df_region_dataframes['Solar Sul']['geracao'], mode='lines', line=dict(color='gray'), name='Solar Sul')
+    fig_regiao = go.Figure()
+    for fonte, df in df_region_dataframes.items():
+        fig_regiao.add_trace(go.Scatter(x=df['instante'], y=df['geracao'], mode='lines', name=fonte))
 
     add_total_line(fig_regiao, df_region_dataframes, 'Total')
-    fig_regiao.update_layout(legend=dict(font=dict(size=20)))  # Aumentar o tamanho do texto da legenda
 
+    fig_regiao.update_layout(
+        legend=dict(font=dict(size=16)),
+        title='Geração por Região',
+        xaxis_title='Instante',
+        yaxis_title='Geração (MW)',
+        margin=dict(t=50, b=50, l=50, r=50),
+        paper_bgcolor='rgba(0,0,0,0)',
+        plot_bgcolor='rgba(0,0,0,0)'
+    )
 
     return fig_rosca, fig_sin, fig_regiao
 
-
 col1, col2 = st.columns(2)
-
 rosca_placeholder = col1.empty()
 sin_placeholder = col2.empty()
 regiao_placeholder = col2.empty()
-ultima_atualizacao_placeholder = st.empty()
+ultima_atualizacao_placeholder = col1.empty()
+tabela_placeholder = st.empty()
 
 # Loop para atualizar os gráficos a cada 60 segundos
 while True:
     dataframes = load_data()
     fig_rosca, fig_sin, fig_regiao = create_charts(dataframes)
-    
+
     rosca_placeholder.plotly_chart(fig_rosca, use_container_width=True)
     sin_placeholder.plotly_chart(fig_sin, use_container_width=True)
     regiao_placeholder.plotly_chart(fig_regiao, use_container_width=True)
     
-    # Exibir a última atualização
+    # Atualizar a última atualização
     ultima_atualizacao = datetime.now().strftime('%d-%m-%Y %H:%M')
     ultima_atualizacao_placeholder.write(f"Última atualização: {ultima_atualizacao}")
+    
+    # Criar a tabela
+    df_table = pd.DataFrame({
+        'Fonte': list(dataframes.keys()),
+        'Geração (MW)': [f"{df['geracao'].iloc[-1]:,.1f}" for df in dataframes.values()]
+    })
+    
+    fig_tabela = ff.create_table(df_table)
+    fig_tabela.update_layout(
+        height=400,
+        margin=dict(t=10, b=10, l=10, r=10),
+        paper_bgcolor='rgba(0,0,0,0)'
+    )
+    tabela_placeholder.plotly_chart(fig_tabela, use_container_width=True)
 
-
-    time.sleep(30)
+    time.sleep(60)
