@@ -62,7 +62,7 @@ def create_charts(dataframes):
             text=f'{total_sin_gwh:.2f} GWh',
             x=0.5,
             y=0.5,
-            font_size=30,  # Aumentar o tamanho do texto
+            font_size=900,  # Aumentar o tamanho do texto
             showarrow=False
         )
     )
@@ -70,9 +70,10 @@ def create_charts(dataframes):
     # Configurar layout do gráfico
     fig_rosca.update_layout(
         title_text='Cenário de Geração do SIN',
-        annotations=[dict(text=f'{total_sin_gwh:.2f} GWh', x=0.5, y=0.5, font_size=30, showarrow=False)],
+        annotations=[dict(text=f'{total_sin_gwh:.2f} GWh', x=0.5, y=0.5, font_size=80, showarrow=False)],
         height=900,  # Aumentar a altura do gráfico
-        width=900    # Aumentar a largura do gráfico
+        width=900,    # Aumentar a largura do gráfico
+        legend=dict(font=dict(size=50))  # Aumentar o tamanho do texto da legenda
     )
 
     # Função para adicionar a linha total de geração
@@ -89,7 +90,7 @@ def create_charts(dataframes):
     fig_sin.add_scatter(x=dataframes['Nuclear']['instante'], y=dataframes['Nuclear']['geracao'], mode='lines', line=dict(color='red'), name='Nuclear')
     fig_sin.add_scatter(x=dataframes['Térmica']['instante'], y=dataframes['Térmica']['geracao'], mode='lines', line=dict(color='purple'), name='Térmica')
     add_total_line(fig_sin, dataframes, 'Total')
-
+    fig_sin.update_layout(legend=dict(font=dict(size=30)))  # Aumentar o tamanho do texto da legenda
     # Geração por Região em um único gráfico
     df_region_dataframes = {
         'Eólica Norte': get_data("https://integra.ons.org.br/api/energiaagora/Get/Geracao_Norte_Eolica_json"),
@@ -113,17 +114,18 @@ def create_charts(dataframes):
     fig_regiao.add_scatter(x=df_region_dataframes['Solar Sul']['instante'], y=df_region_dataframes['Solar Sul']['geracao'], mode='lines', line=dict(color='gray'), name='Solar Sul')
 
     add_total_line(fig_regiao, df_region_dataframes, 'Total')
+    fig_regiao.update_layout(legend=dict(font=dict(size=30)))  # Aumentar o tamanho do texto da legenda
+
 
     return fig_rosca, fig_sin, fig_regiao
 
-# Exibir a última atualização
-ultima_atualizacao = datetime.now().strftime('%d-%m-%Y %H:%M')
-st.write(f"Última atualização: {ultima_atualizacao}")
 
 col1, col2 = st.columns(2)
+
 rosca_placeholder = col1.empty()
 sin_placeholder = col2.empty()
-regiao_placeholder = st.empty()
+regiao_placeholder = col2.empty()
+ultima_atualizacao_placeholder = st.empty()
 
 # Loop para atualizar os gráficos a cada 60 segundos
 while True:
@@ -133,5 +135,10 @@ while True:
     rosca_placeholder.plotly_chart(fig_rosca, use_container_width=True)
     sin_placeholder.plotly_chart(fig_sin, use_container_width=True)
     regiao_placeholder.plotly_chart(fig_regiao, use_container_width=True)
+    
+    # Exibir a última atualização
+    ultima_atualizacao = datetime.now().strftime('%d-%m-%Y %H:%M')
+    ultima_atualizacao_placeholder.write(f"Última atualização: {ultima_atualizacao}")
+
 
     time.sleep(30)
