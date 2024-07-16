@@ -3,10 +3,10 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
+from datetime import datetime
 import time
 
-
-# Função para obter dados e cachear por 60 segundos
+# Função para obter dados e cachear por 20 segundos
 @st.cache_data(ttl=20)
 def get_data(url):
     response = requests.get(url)
@@ -24,53 +24,6 @@ def get_data(url):
 st.set_page_config(layout="wide")
 
 # URLs das fontes de dados
-url_eolica = "https://integra.ons.org.br/api/energiaagora/Get/Geracao_SIN_Eolica_json"
-url_solar = "https://integra.ons.org.br/api/energiaagora/Get/Geracao_SIN_Solar_json"
-url_hidraulica = "https://integra.ons.org.br/api/energiaagora/Get/Geracao_SIN_Hidraulica_json"
-url_nuclear = "https://integra.ons.org.br/api/energiaagora/Get/Geracao_SIN_Nuclear_json"
-url_termica = "https://integra.ons.org.br/api/energiaagora/Get/Geracao_SIN_Termica_json"
-url_norte_eolica = "https://integra.ons.org.br/api/energiaagora/Get/Geracao_Norte_Eolica_json"
-url_norte_solar = "https://integra.ons.org.br/api/energiaagora/Get/Geracao_Norte_Solar_json"
-url_nordeste_eolica = "https://integra.ons.org.br/api/energiaagora/Get/Geracao_Nordeste_Eolica_json"
-url_nordeste_solar = "https://integra.ons.org.br/api/energiaagora/Get/Geracao_Nordeste_Solar_json"
-url_sudeste_e_centro_oeste_eolica = "https://integra.ons.org.br/api/energiaagora/Get/Geracao_SudesteECentroOeste_Eolica_json"
-url_sudeste_e_centro_oeste_solar = "https://integra.ons.org.br/api/energiaagora/Get/Geracao_SudesteECentroOeste_Solar_json"
-url_sul_eolica = "https://integra.ons.org.br/api/energiaagora/Get/Geracao_Sul_Eolica_json"
-url_sul_solar = "https://integra.ons.org.br/api/energiaagora/Get/Geracao_Sul_Solar_json"
-
-# Obtenção dos dados
-df_eolica = get_data(url_eolica)
-df_solar = get_data(url_solar)
-df_hidraulica = get_data(url_hidraulica)
-df_nuclear = get_data(url_nuclear)
-df_termica = get_data(url_termica)
-df_norte_eolica = get_data(url_norte_eolica)
-df_norte_solar = get_data(url_norte_solar)
-df_nordeste_eolica = get_data(url_nordeste_eolica)
-df_nordeste_solar = get_data(url_nordeste_solar)
-df_sudeste_e_centro_oeste_eolica = get_data(url_sudeste_e_centro_oeste_eolica)
-df_sudeste_e_centro_oeste_solar = get_data(url_sudeste_e_centro_oeste_solar)
-df_sul_eolica = get_data(url_sul_eolica)
-df_sul_solar = get_data(url_sul_solar)
-
-# Encontrar a última atualização entre todos os DataFrames
-ultima_atualizacao = max(
-    df_eolica['instante'].max(),
-    df_solar['instante'].max(),
-    df_hidraulica['instante'].max(),
-    df_nuclear['instante'].max(),
-    df_termica['instante'].max(),
-    df_norte_eolica['instante'].max(),
-    df_norte_solar['instante'].max(),
-    df_nordeste_eolica['instante'].max(),
-    df_nordeste_solar['instante'].max(),
-    df_sudeste_e_centro_oeste_eolica['instante'].max(),
-    df_sudeste_e_centro_oeste_solar['instante'].max(),
-    df_sul_eolica['instante'].max(),
-    df_sul_solar['instante'].max()
-)
-
-# URLs das fontes de dados
 urls = {
     'Eólica': "https://integra.ons.org.br/api/energiaagora/Get/Geracao_SIN_Eolica_json",
     'Solar': "https://integra.ons.org.br/api/energiaagora/Get/Geracao_SIN_Solar_json",
@@ -79,76 +32,106 @@ urls = {
     'Térmica': "https://integra.ons.org.br/api/energiaagora/Get/Geracao_SIN_Termica_json"
 }
 
+# Função para carregar e preparar os dados
+def load_data():
+    dataframes = {key: get_data(url) for key, url in urls.items()}
+    return dataframes
+
+# Função para criar gráficos
+def create_charts(dataframes):
+    # Calcular o total de geração do SIN em GWh
+    total_sin_gwh = sum(df['geracao'].iloc[-1] * 60 for df in dataframes.values()) / 1_000  # Convertendo de MWh para GWh
+
+    # Preparar dados para o gráfico de rosca
+    df_total_geracao = pd.DataFrame({
+        'Fonte': list(dataframes.keys()),
+        'Geração (MW)': [df['geracao'].iloc[-1] for df in dataframes.values()]
+    })
+
+    # Criar gráfico de rosca
+    fig_rosca = go.Figure(data=[go.Pie(
+        labels=[f'{row["Fonte"]}<br>{row["Geração (MW)"]:.2f} MW' for _, row in df_total_geracao.iterrows()], 
+        values=df_total_geracao['Geração (MW)'], 
+        hole=.6,
+        hoverinfo='label+percent+value'
+    )])
+
+    # Adicionar anotação no centro do gráfico
+    fig_rosca.add_annotation(
+        dict(
+            text=f'{total_sin_gwh:.2f} GWh',
+            x=0.5,
+            y=0.5,
+            font_size=30,  # Aumentar o tamanho do texto
+            showarrow=False
+        )
+    )
+
+    # Configurar layout do gráfico
+    fig_rosca.update_layout(
+        title_text='Cenário de Geração do SIN',
+        annotations=[dict(text=f'{total_sin_gwh:.2f} GWh', x=0.5, y=0.5, font_size=30, showarrow=False)],
+        height=900,  # Aumentar a altura do gráfico
+        width=900    # Aumentar a largura do gráfico
+    )
+
+    # Função para adicionar a linha total de geração
+    def add_total_line(fig, dataframes, name):
+        df_total = pd.DataFrame(index=dataframes[list(dataframes.keys())[0]]['instante'])
+        df_total['total'] = sum(df.set_index('instante')['geracao'] for df in dataframes.values())
+        fig.add_scatter(x=df_total.index, y=df_total['total'], mode='lines', line=dict(color='white', dash='dash'), name=name)
+
+    # Geração do SIN em um único gráfico
+    fig_sin = px.line(dataframes['Eólica'], x='instante', y='geracao', color_discrete_sequence=['blue'], labels={'geracao': 'Geração (MW)'})
+    fig_sin.add_scatter(x=dataframes['Eólica']['instante'], y=dataframes['Eólica']['geracao'], mode='lines', line=dict(color='blue'), name='Eólica')
+    fig_sin.add_scatter(x=dataframes['Solar']['instante'], y=dataframes['Solar']['geracao'], mode='lines', line=dict(color='green'), name='Solar')
+    fig_sin.add_scatter(x=dataframes['Hidráulica']['instante'], y=dataframes['Hidráulica']['geracao'], mode='lines', line=dict(color='orange'), name='Hidráulica')
+    fig_sin.add_scatter(x=dataframes['Nuclear']['instante'], y=dataframes['Nuclear']['geracao'], mode='lines', line=dict(color='red'), name='Nuclear')
+    fig_sin.add_scatter(x=dataframes['Térmica']['instante'], y=dataframes['Térmica']['geracao'], mode='lines', line=dict(color='purple'), name='Térmica')
+    add_total_line(fig_sin, dataframes, 'Total')
+
+    # Geração por Região em um único gráfico
+    df_region_dataframes = {
+        'Eólica Norte': get_data("https://integra.ons.org.br/api/energiaagora/Get/Geracao_Norte_Eolica_json"),
+        'Solar Norte': get_data("https://integra.ons.org.br/api/energiaagora/Get/Geracao_Norte_Solar_json"),
+        'Eólica Nordeste': get_data("https://integra.ons.org.br/api/energiaagora/Get/Geracao_Nordeste_Eolica_json"),
+        'Solar Nordeste': get_data("https://integra.ons.org.br/api/energiaagora/Get/Geracao_Nordeste_Solar_json"),
+        'Eólica Sudeste/Centro-Oeste': get_data("https://integra.ons.org.br/api/energiaagora/Get/Geracao_SudesteECentroOeste_Eolica_json"),
+        'Solar Sudeste/Centro-Oeste': get_data("https://integra.ons.org.br/api/energiaagora/Get/Geracao_SudesteECentroOeste_Solar_json"),
+        'Eólica Sul': get_data("https://integra.ons.org.br/api/energiaagora/Get/Geracao_Sul_Eolica_json"),
+        'Solar Sul': get_data("https://integra.ons.org.br/api/energiaagora/Get/Geracao_Sul_Solar_json")
+    }
+
+    fig_regiao = px.line(df_region_dataframes['Eólica Norte'], x='instante', y='geracao', color_discrete_sequence=['blue'], labels={'geracao': 'Geração (MW)'})
+    fig_regiao.add_scatter(x=df_region_dataframes['Eólica Norte']['instante'], y=df_region_dataframes['Eólica Norte']['geracao'], mode='lines', line=dict(color='blue'), name='Eólica Norte')
+    fig_regiao.add_scatter(x=df_region_dataframes['Solar Norte']['instante'], y=df_region_dataframes['Solar Norte']['geracao'], mode='lines', line=dict(color='green'), name='Solar Norte')
+    fig_regiao.add_scatter(x=df_region_dataframes['Eólica Nordeste']['instante'], y=df_region_dataframes['Eólica Nordeste']['geracao'], mode='lines', line=dict(color='orange'), name='Eólica Nordeste')
+    fig_regiao.add_scatter(x=df_region_dataframes['Solar Nordeste']['instante'], y=df_region_dataframes['Solar Nordeste']['geracao'], mode='lines', line=dict(color='red'), name='Solar Nordeste')
+    fig_regiao.add_scatter(x=df_region_dataframes['Eólica Sudeste/Centro-Oeste']['instante'], y=df_region_dataframes['Eólica Sudeste/Centro-Oeste']['geracao'], mode='lines', line=dict(color='purple'), name='Eólica Sudeste/Centro-Oeste')
+    fig_regiao.add_scatter(x=df_region_dataframes['Solar Sudeste/Centro-Oeste']['instante'], y=df_region_dataframes['Solar Sudeste/Centro-Oeste']['geracao'], mode='lines', line=dict(color='brown'), name='Solar Sudeste/Centro-Oeste')
+    fig_regiao.add_scatter(x=df_region_dataframes['Eólica Sul']['instante'], y=df_region_dataframes['Eólica Sul']['geracao'], mode='lines', line=dict(color='pink'), name='Eólica Sul')
+    fig_regiao.add_scatter(x=df_region_dataframes['Solar Sul']['instante'], y=df_region_dataframes['Solar Sul']['geracao'], mode='lines', line=dict(color='gray'), name='Solar Sul')
+
+    add_total_line(fig_regiao, df_region_dataframes, 'Total')
+
+    return fig_rosca, fig_sin, fig_regiao
 
 # Exibir a última atualização
-st.write(f"Última atualização: {ultima_atualizacao.strftime('%d-%m-%Y %H:%M')}")
+ultima_atualizacao = datetime.now().strftime('%d-%m-%Y %H:%M')
+st.write(f"Última atualização: {ultima_atualizacao}")
 
 col1, col2 = st.columns(2)
+rosca_placeholder = col1.empty()
+sin_placeholder = col2.empty()
+regiao_placeholder = st.empty()
 
-# Obter dados de cada fonte
-dataframes = {key: get_data(url) for key, url in urls.items()}
+# Loop para atualizar os gráficos a cada 60 segundos
+while True:
+    dataframes = load_data()
+    fig_rosca, fig_sin, fig_regiao = create_charts(dataframes)
+    
+    rosca_placeholder.plotly_chart(fig_rosca, use_container_width=True)
+    sin_placeholder.plotly_chart(fig_sin, use_container_width=True)
+    regiao_placeholder.plotly_chart(fig_regiao, use_container_width=True)
 
-# Calcular o total de geração do SIN em GWh
-total_sin_gwh = sum(df['geracao'].iloc[-1] * 60 for df in dataframes.values()) / 1_000  # Convertendo de MWh para GWh
-
-# Preparar dados para o gráfico de rosca
-df_total_geracao = pd.DataFrame({
-    'Fonte': list(urls.keys()),
-    'Geração (MW)': [df['geracao'].iloc[-1] for df in dataframes.values()]
-})
-
-# Criar gráfico de rosca
-fig_rosca = go.Figure(data=[go.Pie(
-    labels=[f'{row["Fonte"]}<br>{row["Geração (MW)"]:.2f} MW' for _, row in df_total_geracao.iterrows()], 
-    values=df_total_geracao['Geração (MW)'], 
-    hole=.6,
-    hoverinfo='label+percent+value'
-)])
-
-# Adicionar anotação no centro do gráfico
-fig_rosca.add_annotation(
-    dict(
-        text=f'{total_sin_gwh:.2f} GWh',
-        x=0.5,
-        y=0.5,
-        font_size=20,
-        showarrow=False
-    )
-)
-
-# Configurar layout do gráfico
-fig_rosca.update_layout(
-    title_text='Cenário de Geração do SIN',
-    annotations=[dict(text=f'{total_sin_gwh:.2f} GW', x=0.5, y=0.5, font_size=20, showarrow=False)]
-)
-
-# Exibir o gráfico na aplicação Streamlit
-col1.plotly_chart(fig_rosca, use_container_width=True)
-
-# Geração do SIN em um único gráfico
-col2.subheader('Geração do SIN')
-fig_sin = px.line(df_eolica, x='instante', y='geracao', color_discrete_sequence=['blue'], labels={'geracao': 'Geração (MW)'})
-#fig_sin.add_scatter(x=df_total_geracao['instante'], y=df_total_geracao['geracao'], mode='lines', line=dict(color='white'), name='Total')
-fig_sin.add_scatter(x=df_eolica['instante'], y=df_eolica['geracao'], mode='lines', line=dict(color='blue'), name='Eólica')
-fig_sin.add_scatter(x=df_solar['instante'], y=df_solar['geracao'], mode='lines', line=dict(color='green'), name='Solar')
-fig_sin.add_scatter(x=df_hidraulica['instante'], y=df_hidraulica['geracao'], mode='lines', line=dict(color='orange'), name='Hidráulica')
-fig_sin.add_scatter(x=df_nuclear['instante'], y=df_nuclear['geracao'], mode='lines', line=dict(color='red'), name='Nuclear')
-fig_sin.add_scatter(x=df_termica['instante'], y=df_termica['geracao'], mode='lines', line=dict(color='purple'), name='Térmica')
-col2.plotly_chart(fig_sin, use_container_width=True)
-
-# Geração por Região em um único gráfico
-st.subheader('Geração por Região')
-fig_regiao = px.line(df_norte_eolica, x='instante', y='geracao', color_discrete_sequence=['blue'], labels={'geracao': 'Geração (MW)'})
-fig_regiao.add_scatter(x=df_norte_eolica['instante'], y=df_norte_eolica['geracao'], mode='lines', line=dict(color='blue'), name='Eólica Norte')
-fig_regiao.add_scatter(x=df_norte_solar['instante'], y=df_norte_solar['geracao'], mode='lines', line=dict(color='green'), name='Solar Norte')
-fig_regiao.add_scatter(x=df_nordeste_eolica['instante'], y=df_nordeste_eolica['geracao'], mode='lines', line=dict(color='orange'), name='Eólica Nordeste')
-fig_regiao.add_scatter(x=df_nordeste_solar['instante'], y=df_nordeste_solar['geracao'], mode='lines', line=dict(color='red'), name='Solar Nordeste')
-fig_regiao.add_scatter(x=df_sudeste_e_centro_oeste_eolica['instante'], y=df_sudeste_e_centro_oeste_eolica['geracao'], mode='lines', line=dict(color='purple'), name='Eólica Sudeste/Centro-Oeste')
-fig_regiao.add_scatter(x=df_sudeste_e_centro_oeste_solar['instante'], y=df_sudeste_e_centro_oeste_solar['geracao'], mode='lines', line=dict(color='brown'), name='Solar Sudeste/Centro-Oeste')
-fig_regiao.add_scatter(x=df_sul_eolica['instante'], y=df_sul_eolica['geracao'], mode='lines', line=dict(color='pink'), name='Eólica Sul')
-fig_regiao.add_scatter(x=df_sul_solar['instante'], y=df_sul_solar['geracao'], mode='lines', line=dict(color='gray'), name='Solar Sul')
-st.plotly_chart(fig_regiao, use_container_width=True)
-
-# Pausar por 60 segundos antes da próxima atualização
-time.sleep(60)
-st.experimental_rerun()
+    time.sleep(30)
