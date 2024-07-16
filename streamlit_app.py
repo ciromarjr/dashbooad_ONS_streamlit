@@ -170,28 +170,28 @@ while True:
     df_table = pd.DataFrame({
         'Região': ['Sudeste/Centro-Oeste', 'Sul', 'Nordeste', 'Norte'],
         'Geração Total (MW)': [
-            balanco['sudesteECentroOeste']['geracao']['total'],
-            balanco['sul']['geracao']['total'],
-            balanco['nordeste']['geracao']['total'],
-            balanco['norte']['geracao']['total']
+            round(balanco['sudesteECentroOeste']['geracao']['total'] / 1000, 2),  # Ajustar para MW e formatar
+            round(balanco['sul']['geracao']['total'] / 1000, 2),                  # Ajustar para MW e formatar
+            round(balanco['nordeste']['geracao']['total'] / 1000, 2),             # Ajustar para MW e formatar
+            round(balanco['norte']['geracao']['total'] / 1000, 2)                 # Ajustar para MW e formatar
         ],
         'Carga Verificada (MW)': [
-            balanco['sudesteECentroOeste']['cargaVerificada'],
-            balanco['sul']['cargaVerificada'],
-            balanco['nordeste']['cargaVerificada'],
-            balanco['norte']['cargaVerificada']
+            round(balanco['sudesteECentroOeste']['cargaVerificada'] / 1000, 2),
+            round(balanco['sul']['cargaVerificada'] / 1000, 2),
+            round(balanco['nordeste']['cargaVerificada'] / 1000, 2),
+            round(balanco['norte']['cargaVerificada'] / 1000, 2)
         ],
         'Importação (MW)': [
-            balanco['sudesteECentroOeste']['importacao'],
-            balanco['sul']['importacao'],
-            balanco['nordeste']['importacao'],
-            balanco['norte']['importacao']
+            round(balanco['sudesteECentroOeste']['importacao']/ 1000, 2),
+            round(balanco['sul']['importacao'] / 1000, 2),
+            round(balanco['nordeste']['importacao'] / 1000, 2),
+            round(balanco['norte']['importacao'] / 1000, 2)
         ],
         'Exportação (MW)': [
-            balanco['sudesteECentroOeste']['exportacao'],
-            balanco['sul']['exportacao'],
-            balanco['nordeste']['exportacao'],
-            balanco['norte']['exportacao']
+            round(balanco['sudesteECentroOeste']['exportacao'] / 1000, 2),
+            round(balanco['sul']['exportacao'] / 1000, 2),
+            round(balanco['nordeste']['exportacao'] / 1000, 2),
+            round(balanco['norte']['exportacao'] / 1000, 2)
         ]
     })
     
@@ -201,7 +201,6 @@ while True:
         margin=dict(t=10, b=10, l=10, r=10),
         paper_bgcolor='rgba(0,0,0,0)',
         font=dict(size=30)  # Aumentar o tamanho do texto da tabela
-        
     )
     tabela_placeholder.plotly_chart(fig_tabela, use_container_width=True)
 
