@@ -21,6 +21,12 @@ def get_data(url):
     
     return df
 
+@st.cache_data(ttl=20)
+def get_balanco_energetico(url):
+    response = requests.get(url)
+    data = response.json()
+    return data
+
 st.set_page_config(layout="wide")
 
 # URLs das fontes de dados
@@ -32,10 +38,13 @@ urls = {
     'Térmica': "https://integra.ons.org.br/api/energiaagora/Get/Geracao_SIN_Termica_json"
 }
 
+balanco_url = "https://integra.ons.org.br/api/energiaagora/GetBalancoEnergetico/null"
+
 # Função para carregar e preparar os dados
 def load_data():
     dataframes = {key: get_data(url) for key, url in urls.items()}
-    return dataframes
+    balanco = get_balanco_energetico(balanco_url)
+    return dataframes, balanco
 
 # Função para criar gráficos
 def create_charts(dataframes):
@@ -145,7 +154,7 @@ tabela_placeholder = st.empty()
 
 # Loop para atualizar os gráficos a cada 60 segundos
 while True:
-    dataframes = load_data()
+    dataframes, balanco = load_data()
     fig_rosca, fig_sin, fig_regiao = create_charts(dataframes)
 
     rosca_placeholder.plotly_chart(fig_rosca, use_container_width=True)
@@ -158,8 +167,31 @@ while True:
     
     # Criar a tabela
     df_table = pd.DataFrame({
-        'Fonte': list(dataframes.keys()),
-        'Geração (MW)': [f"{df['geracao'].iloc[-1]:,.1f}" for df in dataframes.values()]
+        'Região': ['Sudeste/Centro-Oeste', 'Sul', 'Nordeste', 'Norte'],
+        'Geração Total (MW)': [
+            balanco['sudesteECentroOeste']['geracao']['total'],
+            balanco['sul']['geracao']['total'],
+            balanco['nordeste']['geracao']['total'],
+            balanco['norte']['geracao']['total']
+        ],
+        'Carga Verificada (MW)': [
+            balanco['sudesteECentroOeste']['cargaVerificada'],
+            balanco['sul']['cargaVerificada'],
+            balanco['nordeste']['cargaVerificada'],
+            balanco['norte']['cargaVerificada']
+        ],
+        'Importação (MW)': [
+            balanco['sudesteECentroOeste']['importacao'],
+            balanco['sul']['importacao'],
+            balanco['nordeste']['importacao'],
+            balanco['norte']['importacao']
+        ],
+        'Exportação (MW)': [
+            balanco['sudesteECentroOeste']['exportacao'],
+            balanco['sul']['exportacao'],
+            balanco['nordeste']['exportacao'],
+            balanco['norte']['exportacao']
+        ]
     })
     
     fig_tabela = ff.create_table(df_table)
