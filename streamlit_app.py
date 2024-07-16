@@ -146,10 +146,11 @@ def create_charts(dataframes):
     return fig_rosca, fig_sin, fig_regiao
 
 col1, col2 = st.columns(2)
+ultima_atualizacao_placeholder = col1.empty()
 rosca_placeholder = col1.empty()
 sin_placeholder = col2.empty()
 regiao_placeholder = col2.empty()
-ultima_atualizacao_placeholder = st.empty()
+
 tabela_placeholder = st.empty()
 
 # Loop para atualizar os gráficos a cada 60 segundos
@@ -198,8 +199,10 @@ while True:
     fig_tabela.update_layout(
         height=400,
         margin=dict(t=10, b=10, l=10, r=10),
-        paper_bgcolor='rgba(0,0,0,0)'
+        paper_bgcolor='rgba(0,0,0,0)',
+        font=dict(size=30)  # Aumentar o tamanho do texto da tabela
+        
     )
     tabela_placeholder.plotly_chart(fig_tabela, use_container_width=True)
 
-    time.sleep(10)
+    time.sleep(60)
