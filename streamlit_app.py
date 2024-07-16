@@ -84,7 +84,7 @@ def create_charts(dataframes):
         height=700,
         width=700,
         legend=dict(
-            font=dict(size=50),
+            font=dict(size=30),
             title="Fontes de Energia"
         ),
         margin=dict(t=50, b=50, l=50, r=50),
