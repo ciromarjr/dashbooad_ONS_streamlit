@@ -117,7 +117,7 @@ def create_charts(dataframes):
         values=df_total_geracao['Geração (MW)'], 
         hole=.6,
         hoverinfo='label+percent+value',
-        textfont_size=20,  # Tamanho do texto da porcentagem
+        textfont_size=50,  # Tamanho do texto da porcentagem
         marker=dict(colors=colors[:len(df_total_geracao)])
     )])
 
@@ -127,7 +127,7 @@ def create_charts(dataframes):
             text=f'{total_sin_gwh:.2f} GW',
             x=0.5,
             y=0.5,
-            font_size=30,
+            font_size=80,
             showarrow=False
         )
     )
@@ -135,11 +135,11 @@ def create_charts(dataframes):
     # Configurar layout do gráfico
     fig_rosca.update_layout(
         title_text='Cenário de Geração do SIN',
-        annotations=[dict(text=f'{total_sin_gwh:.2f} GW', x=0.5, y=0.5, font_size=30, showarrow=False)],
-        height=700,
-        width=700,
+        annotations=[dict(text=f'{total_sin_gwh:.2f} GW', x=0.5, y=0.5, font_size=90, showarrow=False)],
+        height=800,
+        width=800,
         legend=dict(
-            font=dict(size=15),
+            font=dict(size=18),
             title="Fontes de Energia"
         ),
         margin=dict(t=50, b=50, l=50, r=50),
@@ -162,7 +162,7 @@ def create_charts(dataframes):
     add_total_line(fig_sin, dataframes, 'Total')
 
     fig_sin.update_layout(
-        legend=dict(font=dict(size=15)),
+        legend=dict(font=dict(size=18)),
         title='Geração do SIN',
         xaxis_title='Instante',
         yaxis_title='Geração (MW)',
@@ -203,7 +203,7 @@ def create_charts(dataframes):
     add_total_line(fig_regiao, df_region_dataframes, 'Total')
 
     fig_regiao.update_layout(
-        legend=dict(font=dict(size=15)),
+        legend=dict(font=dict(size=18)),
         title='Geração por Região',
         xaxis_title='Instante',
         yaxis_title='Geração (MW)',
@@ -270,7 +270,7 @@ while True:
             height=400,
             margin=dict(t=10, b=10, l=10, r=10),
             paper_bgcolor='rgba(0,0,0,0)',
-            font=dict(size=20)  # Aumentar o tamanho do texto da tabela
+            font=dict(size=40)  # Aumentar o tamanho do texto da tabela
         )
         tabela_placeholder.plotly_chart(fig_tabela, use_container_width=True)
 
