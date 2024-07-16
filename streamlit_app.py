@@ -202,4 +202,4 @@ while True:
     )
     tabela_placeholder.plotly_chart(fig_tabela, use_container_width=True)
 
-    time.sleep(60)
+    time.sleep(10)
