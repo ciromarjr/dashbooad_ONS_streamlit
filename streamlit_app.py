@@ -140,7 +140,7 @@ col1, col2 = st.columns(2)
 rosca_placeholder = col1.empty()
 sin_placeholder = col2.empty()
 regiao_placeholder = col2.empty()
-ultima_atualizacao_placeholder = col1.empty()
+ultima_atualizacao_placeholder = st.empty()
 tabela_placeholder = st.empty()
 
 # Loop para atualizar os gráficos a cada 60 segundos
