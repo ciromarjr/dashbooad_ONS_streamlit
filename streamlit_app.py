@@ -59,7 +59,7 @@ def create_charts(dataframes):
     # Adicionar anotação no centro do gráfico
     fig_rosca.add_annotation(
         dict(
-            text=f'{total_sin_gwh:.2f} GWh',
+            text=f'{total_sin_gwh:.2f} GW',
             x=0.5,
             y=0.5,
             font_size=900,  # Aumentar o tamanho do texto
@@ -70,10 +70,10 @@ def create_charts(dataframes):
     # Configurar layout do gráfico
     fig_rosca.update_layout(
         title_text='Cenário de Geração do SIN',
-        annotations=[dict(text=f'{total_sin_gwh:.2f} GWh', x=0.5, y=0.5, font_size=80, showarrow=False)],
+        annotations=[dict(text=f'{total_sin_gwh:.2f} GW', x=0.5, y=0.5, font_size=70, showarrow=False)],
         height=900,  # Aumentar a altura do gráfico
         width=900,    # Aumentar a largura do gráfico
-        legend=dict(font=dict(size=50))  # Aumentar o tamanho do texto da legenda
+        legend=dict(font=dict(size=30))  # Aumentar o tamanho do texto da legenda
     )
 
     # Função para adicionar a linha total de geração
@@ -90,7 +90,7 @@ def create_charts(dataframes):
     fig_sin.add_scatter(x=dataframes['Nuclear']['instante'], y=dataframes['Nuclear']['geracao'], mode='lines', line=dict(color='red'), name='Nuclear')
     fig_sin.add_scatter(x=dataframes['Térmica']['instante'], y=dataframes['Térmica']['geracao'], mode='lines', line=dict(color='purple'), name='Térmica')
     add_total_line(fig_sin, dataframes, 'Total')
-    fig_sin.update_layout(legend=dict(font=dict(size=30)))  # Aumentar o tamanho do texto da legenda
+    fig_sin.update_layout(legend=dict(font=dict(size=20)))  # Aumentar o tamanho do texto da legenda
     # Geração por Região em um único gráfico
     df_region_dataframes = {
         'Eólica Norte': get_data("https://integra.ons.org.br/api/energiaagora/Get/Geracao_Norte_Eolica_json"),
@@ -114,7 +114,7 @@ def create_charts(dataframes):
     fig_regiao.add_scatter(x=df_region_dataframes['Solar Sul']['instante'], y=df_region_dataframes['Solar Sul']['geracao'], mode='lines', line=dict(color='gray'), name='Solar Sul')
 
     add_total_line(fig_regiao, df_region_dataframes, 'Total')
-    fig_regiao.update_layout(legend=dict(font=dict(size=30)))  # Aumentar o tamanho do texto da legenda
+    fig_regiao.update_layout(legend=dict(font=dict(size=20)))  # Aumentar o tamanho do texto da legenda
 
 
     return fig_rosca, fig_sin, fig_regiao
