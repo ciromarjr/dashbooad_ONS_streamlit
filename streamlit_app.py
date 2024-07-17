@@ -6,6 +6,7 @@ import plotly.figure_factory as ff
 from datetime import datetime
 import time
 
+
 # Função para obter dados e cachear por 20 segundos
 @st.cache_data(ttl=20)
 def get_data(url):
