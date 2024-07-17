@@ -57,13 +57,17 @@ def create_charts(dataframes):
         'Geração (MW)': [df['geracao'].iloc[-1] for df in dataframes.values()]
     })
 
+    # Definindo cores personalizadas
+    colors = ['#636EFA', '#EF553B', '#00CC96', '#AB63FA', '#FFA15A']
+
     # Criar gráfico de rosca
     fig_rosca = go.Figure(data=[go.Pie(
         labels=[f'{row["Fonte"]}<br>{row["Geração (MW)"]:.2f} MW' for _, row in df_total_geracao.iterrows()], 
         values=df_total_geracao['Geração (MW)'], 
         hole=.6,
         hoverinfo='label+percent+value',
-        textfont_size=50  # Aumentar o tamanho do texto da porcentagem
+        textfont_size=50,  # Aumentar o tamanho do texto da porcentagem
+        marker=dict(colors=colors)  # Aplicar cores personalizadas
     )])
 
     # Adicionar anotação no centro do gráfico
@@ -162,9 +166,9 @@ while True:
     sin_placeholder.plotly_chart(fig_sin, use_container_width=True)
     regiao_placeholder.plotly_chart(fig_regiao, use_container_width=True)
     
-    # Atualizar a última atualização
-    ultima_atualizacao = datetime.now().strftime('%d-%m-%Y %H:%M')
-    ultima_atualizacao_placeholder.write(f"Última atualização: {ultima_atualizacao}")
+    # Pegar a última data dos dados para exibir como horário de atualização
+    ultima_data = max(df['instante'].max() for df in dataframes.values()).strftime('%d-%m-%Y %H:%M')
+    ultima_atualizacao_placeholder.write(f"Última atualização dos dados: {ultima_data}")
     
     # Criar a tabela
     df_table = pd.DataFrame({
