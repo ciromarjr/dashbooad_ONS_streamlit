@@ -6,6 +6,8 @@ import plotly.figure_factory as ff
 from datetime import datetime
 import time
 
+
+
 # Função para obter dados e cachear por 20 segundoss
 
 @st.cache_data(ttl=20)
@@ -209,4 +211,4 @@ while True:
     )
     tabela_placeholder.plotly_chart(fig_tabela, use_container_width=True)
 
-    time.sleep(60)
+    time.sleep(10)
