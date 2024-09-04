@@ -6,10 +6,7 @@ import plotly.figure_factory as ff
 from datetime import datetime
 import time
 
-
-
-# Função para obter dados e cachear por 20 segundoss
-
+# Função para obter dados e cachear por 20 segundos
 @st.cache_data(ttl=20)
 def get_data(url):
     response = requests.get(url)
@@ -43,6 +40,9 @@ urls = {
 
 balanco_url = "https://integra.ons.org.br/api/energiaagora/GetBalancoEnergetico/null"
 
+# Definir a cor da fonte
+font_color = 'white'  # Ou qualquer cor desejada
+
 # Função para carregar e preparar os dados
 def load_data():
     dataframes = {key: get_data(url) for key, url in urls.items()}
@@ -70,7 +70,7 @@ def create_charts(dataframes):
         hole=.6,
         hoverinfo='label+percent+value',
         textfont_size=50,  # Aumentar o tamanho do texto da porcentagem
-        marker=dict(colors=colors)  # Aplicar cores personalizadas
+        marker=dict(colors=colors)
     )])
 
     # Adicionar anotação no centro do gráfico
@@ -80,30 +80,32 @@ def create_charts(dataframes):
             x=0.5,
             y=0.5,
             font_size=300,
-            showarrow=False
+            showarrow=False,
+            font_color=font_color  # Aplicar a cor da fonte aqui
         )
     )
 
     # Configurar layout do gráfico
     fig_rosca.update_layout(
         title_text='Cenário de Geração do SIN',
-        annotations=[dict(text=f'{total_sin_gwh:.2f} GW', x=0.5, y=0.5, font_size=70, showarrow=False)],
+        annotations=[dict(text=f'{total_sin_gwh:.2f} GW', x=0.5, y=0.5, font_size=70, showarrow=False, font_color=font_color)],
         height=700,
         width=700,
         legend=dict(
-            font=dict(size=20),
+            font=dict(size=20, color=font_color),
             title="Fontes de Energia"
         ),
         margin=dict(t=50, b=50, l=50, r=50),
         paper_bgcolor='rgba(0,0,0,0)',
-        plot_bgcolor='rgba(0,0,0,0)'
+        plot_bgcolor='rgba(0,0,0,0)',
+        font=dict(color=font_color)  # Aplicar a cor da fonte no layout
     )
 
     # Função para adicionar a linha total de geração
     def add_total_line(fig, dataframes, name):
         df_total = pd.DataFrame(index=dataframes[list(dataframes.keys())[0]]['instante'])
         df_total['total'] = sum(df.set_index('instante')['geracao'] for df in dataframes.values())
-        fig.add_trace(go.Scatter(x=df_total.index, y=df_total['total'], mode='lines', line=dict(color='white', dash='dash'), name=name))
+        fig.add_trace(go.Scatter(x=df_total.index, y=df_total['total'], mode='lines', line=dict(color=font_color, dash='dash'), name=name))
 
     # Geração do SIN em um único gráfico
     fig_sin = go.Figure()
@@ -113,13 +115,14 @@ def create_charts(dataframes):
     add_total_line(fig_sin, dataframes, 'Total')
 
     fig_sin.update_layout(
-        legend=dict(font=dict(size=19)),
+        legend=dict(font=dict(size=19, color=font_color)),
         title='Geração do SIN',
         xaxis_title='Instante',
         yaxis_title='Geração (MW)',
         margin=dict(t=50, b=50, l=50, r=50),
         paper_bgcolor='rgba(0,0,0,0)',
-        plot_bgcolor='rgba(0,0,0,0)'
+        plot_bgcolor='rgba(0,0,0,0)',
+        font=dict(color=font_color)  # Aplicar a cor da fonte no layout
     )
 
     # Geração por Região em um único gráfico
@@ -141,13 +144,14 @@ def create_charts(dataframes):
     add_total_line(fig_regiao, df_region_dataframes, 'Total')
 
     fig_regiao.update_layout(
-        legend=dict(font=dict(size=19)),
+        legend=dict(font=dict(size=19, color=font_color)),
         title='Geração por Região',
         xaxis_title='Instante',
         yaxis_title='Geração (MW)',
         margin=dict(t=50, b=50, l=50, r=50),
         paper_bgcolor='rgba(0,0,0,0)',
-        plot_bgcolor='rgba(0,0,0,0)'
+        plot_bgcolor='rgba(0,0,0,0)',
+        font=dict(color=font_color)  # Aplicar a cor da fonte no layout
     )
 
     return fig_rosca, fig_sin, fig_regiao
@@ -207,7 +211,7 @@ while True:
         height=400,
         margin=dict(t=10, b=10, l=10, r=10),
         paper_bgcolor='rgba(0,0,0,0)',
-        font=dict(size=30)  # Aumentar o tamanho do texto da tabela
+        font=dict(size=30, color=font_color)  # Aumentar o tamanho e aplicar a cor do texto da tabela
     )
     tabela_placeholder.plotly_chart(fig_tabela, use_container_width=True)
 
