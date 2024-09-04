@@ -88,11 +88,11 @@ def create_charts(dataframes):
     # Configurar layout do gráfico
     fig_rosca.update_layout(
         title_text='Cenário de Geração do SIN',
-        annotations=[dict(text=f'{total_sin_gwh:.2f} GW', x=0.5, y=0.5, font_size=70, showarrow=False, font_color=font_color)],
+        annotations=[dict(text=f'{total_sin_gwh:.2f} GW', x=0.5, y=0.5, font_size=80, showarrow=False, font_color=font_color)],
         height=700,
         width=700,
         legend=dict(
-            font=dict(size=20, color=font_color),
+            font=dict(size=30, color=font_color),
             title="Fontes de Energia"
         ),
         margin=dict(t=50, b=50, l=50, r=50),
@@ -115,7 +115,7 @@ def create_charts(dataframes):
     add_total_line(fig_sin, dataframes, 'Total')
 
     fig_sin.update_layout(
-        legend=dict(font=dict(size=19, color=font_color)),
+        legend=dict(font=dict(size=20, color=font_color)),
         title='Geração do SIN',
         xaxis_title='Instante',
         yaxis_title='Geração (MW)',
