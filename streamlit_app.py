@@ -9,23 +9,39 @@ import time
 # Função para obter dados e cachear por 20 segundos
 @st.cache_data(ttl=20)
 def get_data(url):
-    response = requests.get(url)
-    data = response.json()
-    df = pd.DataFrame(data)
+    try:
+        response = requests.get(url)
+        if response.status_code == 200:
+            # Verifica se a resposta não está vazia
+            if response.content and response.content.strip():
+                try:
+                    data = response.json()
+                    if isinstance(data, list) and data:  # Verifica se os dados são uma lista não vazia
+                        df = pd.DataFrame(data)
+                        if not df.empty:
+                            # Ajustando o formato da data
+                            df['instante'] = pd.to_datetime(df['instante'], errors='coerce')
+                            # Remover linhas com datas inválidas
+                            df = df.dropna(subset=['instante'])
+                            # Convertendo geração para MW (assumindo que os dados são originalmente em MWh)
+                            df['geracao'] = df['geracao'] / 60  # Convertendo de MWh para MW
+                            return df
+                except ValueError:
+                    print(f"Erro ao decodificar JSON de {url}")
+    except Exception as e:
+        print(f"Erro ao carregar dados de {url}: {e}")
     
-    # Ajustando o formato da data
-    df['instante'] = pd.to_datetime(df['instante'])
-    
-    # Convertendo geração para MW (assumindo que os dados são originalmente em MWh)
-    df['geracao'] = df['geracao'] / 60  # Convertendo de MWh para MW
-    
-    return df
+    return None  # Se a requisição falhar ou os dados forem inválidos
 
 @st.cache_data(ttl=20)
 def get_balanco_energetico(url):
-    response = requests.get(url)
-    data = response.json()
-    return data
+    try:
+        response = requests.get(url)
+        if response.status_code == 200:
+            return response.json()
+    except Exception as e:
+        print(f"Erro ao carregar balanço energético: {e}")
+    return None
 
 st.set_page_config(layout="wide")
 
@@ -46,6 +62,8 @@ font_color = 'white'  # Ou qualquer cor desejada
 # Função para carregar e preparar os dados
 def load_data():
     dataframes = {key: get_data(url) for key, url in urls.items()}
+    # Remover entradas onde os dados são None
+    dataframes = {key: df for key, df in dataframes.items() if df is not None}
     balanco = get_balanco_energetico(balanco_url)
     return dataframes, balanco
 
@@ -134,8 +152,20 @@ def create_charts(dataframes):
         'Eólica Sudeste/Centro-Oeste': get_data("https://integra.ons.org.br/api/energiaagora/Get/Geracao_SudesteECentroOeste_Eolica_json"),
         'Solar Sudeste/Centro-Oeste': get_data("https://integra.ons.org.br/api/energiaagora/Get/Geracao_SudesteECentroOeste_Solar_json"),
         'Eólica Sul': get_data("https://integra.ons.org.br/api/energiaagora/Get/Geracao_Sul_Eolica_json"),
-        'Solar Sul': get_data("https://integra.ons.org.br/api/energiaagora/Get/Geracao_Sul_Solar_json")
+        'Solar Sul': get_data("https://integra.ons.org.br/api/energiaagora/Get/Geracao_Sul_Solar_json"),
+        'Norte Hidráulica': get_data("https://integra.ons.org.br/api/energiaagora/Get/Geracao_Norte_Hidraulica_json"),
+        'Norte Nuclear': get_data("https://integra.ons.org.br/api/energiaagora/Get/Geracao_Norte_Nuclear_json"),
+        'Norte Térmica': get_data("https://integra.ons.org.br/api/energiaagora/Get/Geracao_Norte_Termica_json"),
+        'Nordeste Hidráulica': get_data("https://integra.ons.org.br/api/energiaagora/Get/Geracao_Nordeste_Hidraulica_json"),
+        'Nordeste Nuclear': get_data("https://integra.ons.org.br/api/energiaagora/Get/Geracao_Nordeste_Nuclear_json"),
+        'Nordeste Térmica': get_data("https://integra.ons.org.br/api/energiaagora/Get/Geracao_Nordeste_Termica_json"),
+        'Sudeste/Centro-Oeste Hidráulica': get_data("https://integra.ons.org.br/api/energiaagora/Get/Geracao_SudesteECentroOeste_Hidraulica_json"),
+        'Sudeste/Centro-Oeste Nuclear': get_data("https://integra.ons.org.br/api/energiaagora/Get/Geracao_SudesteECentroOeste_Nuclear_json"),
+        'Sudeste/Centro-Oeste Térmica': get_data("https://integra.ons.org.br/api/energiaagora/Get/Geracao_SudesteECentroOeste_Termica_json")
     }
+
+    # Remover entradas com dados inválidos (None)
+    df_region_dataframes = {key: df for key, df in df_region_dataframes.items() if df is not None}
 
     fig_regiao = go.Figure()
     for fonte, df in df_region_dataframes.items():
@@ -174,45 +204,47 @@ while True:
     regiao_placeholder.plotly_chart(fig_regiao, use_container_width=True)
     
     # Pegar a última data dos dados para exibir como horário de atualização
-    ultima_data = max(df['instante'].max() for df in dataframes.values()).strftime('%d-%m-%Y %H:%M')
-    ultima_atualizacao_placeholder.write(f"Última atualização dos dados: {ultima_data}")
+    if dataframes:
+        ultima_data = max(df['instante'].max() for df in dataframes.values()).strftime('%d-%m-%Y %H:%M')
+        ultima_atualizacao_placeholder.write(f"Última atualização dos dados: {ultima_data}")
     
-    # Criar a tabela
-    df_table = pd.DataFrame({
-        'Região': ['Sudeste/Centro-Oeste', 'Sul', 'Nordeste', 'Norte'],
-        'Geração Total (MW)': [
-            round(balanco['sudesteECentroOeste']['geracao']['total'] / 1000, 2),  # Ajustar para MW e formatar
-            round(balanco['sul']['geracao']['total'] / 1000, 2),                  # Ajustar para MW e formatar
-            round(balanco['nordeste']['geracao']['total'] / 1000, 2),             # Ajustar para MW e formatar
-            round(balanco['norte']['geracao']['total'] / 1000, 2)                 # Ajustar para MW e formatar
-        ],
-        'Carga Verificada (MW)': [
-            round(balanco['sudesteECentroOeste']['cargaVerificada'] / 1000, 2),
-            round(balanco['sul']['cargaVerificada'] / 1000, 2),
-            round(balanco['nordeste']['cargaVerificada'] / 1000, 2),
-            round(balanco['norte']['cargaVerificada'] / 1000, 2)
-        ],
-        'Importação (MW)': [
-            round(balanco['sudesteECentroOeste']['importacao']/ 1000, 2),
-            round(balanco['sul']['importacao'] / 1000, 2),
-            round(balanco['nordeste']['importacao'] / 1000, 2),
-            round(balanco['norte']['importacao'] / 1000, 2)
-        ],
-        'Exportação (MW)': [
-            round(balanco['sudesteECentroOeste']['exportacao'] / 1000, 2),
-            round(balanco['sul']['exportacao'] / 1000, 2),
-            round(balanco['nordeste']['exportacao'] / 1000, 2),
-            round(balanco['norte']['exportacao'] / 1000, 2)
-        ]
-    })
-    
-    fig_tabela = ff.create_table(df_table)
-    fig_tabela.update_layout(
-        height=400,
-        margin=dict(t=10, b=10, l=10, r=10),
-        paper_bgcolor='rgba(0,0,0,0)',
-        font=dict(size=55, color=font_color)  # Aumentar o tamanho e aplicar a cor do texto da tabela
-    )
-    tabela_placeholder.plotly_chart(fig_tabela, use_container_width=True)
+    # Criar a tabela se o balanco estiver disponível
+    if balanco:
+        df_table = pd.DataFrame({
+            'Região': ['Sudeste/Centro-Oeste', 'Sul', 'Nordeste', 'Norte'],
+            'Geração Total (MW)': [
+                round(balanco['sudesteECentroOeste']['geracao']['total'] / 1000, 2),  # Ajustar para MW e formatar
+                round(balanco['sul']['geracao']['total'] / 1000, 2),                  # Ajustar para MW e formatar
+                round(balanco['nordeste']['geracao']['total'] / 1000, 2),             # Ajustar para MW e formatar
+                round(balanco['norte']['geracao']['total'] / 1000, 2)                 # Ajustar para MW e formatar
+            ],
+            'Carga Verificada (MW)': [
+                round(balanco['sudesteECentroOeste']['cargaVerificada'] / 1000, 2),
+                round(balanco['sul']['cargaVerificada'] / 1000, 2),
+                round(balanco['nordeste']['cargaVerificada'] / 1000, 2),
+                round(balanco['norte']['cargaVerificada'] / 1000, 2)
+            ],
+            'Importação (MW)': [
+                round(balanco['sudesteECentroOeste']['importacao']/ 1000, 2),
+                round(balanco['sul']['importacao'] / 1000, 2),
+                round(balanco['nordeste']['importacao'] / 1000, 2),
+                round(balanco['norte']['importacao'] / 1000, 2)
+            ],
+            'Exportação (MW)': [
+                round(balanco['sudesteECentroOeste']['exportacao'] / 1000, 2),
+                round(balanco['sul']['exportacao'] / 1000, 2),
+                round(balanco['nordeste']['exportacao'] / 1000, 2),
+                round(balanco['norte']['exportacao'] / 1000, 2)
+            ]
+        })
+        
+        fig_tabela = ff.create_table(df_table)
+        fig_tabela.update_layout(
+            height=400,
+            margin=dict(t=10, b=10, l=10, r=10),
+            paper_bgcolor='rgba(0,0,0,0)',
+            font=dict(size=80, color=font_color)  # Aumentar o tamanho e aplicar a cor do texto da tabela
+        )
+        tabela_placeholder.plotly_chart(fig_tabela, use_container_width=True)
 
     time.sleep(10)
