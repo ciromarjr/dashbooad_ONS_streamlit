@@ -243,7 +243,7 @@ while True:
             height=400,
             margin=dict(t=10, b=10, l=10, r=10),
             paper_bgcolor='rgba(0,0,0,0)',
-            font=dict(size=80, color=font_color)  # Aumentar o tamanho e aplicar a cor do texto da tabela
+            font=dict(size=55, color=font_color)  # Aumentar o tamanho e aplicar a cor do texto da tabela
         )
         tabela_placeholder.plotly_chart(fig_tabela, use_container_width=True)
 
