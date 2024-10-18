@@ -64,19 +64,18 @@ def get_situacao_reservatorios():
 # Configuração da página
 st.set_page_config(page_title="Geração Elétrica e Reservatórios", page_icon="⚡", layout="wide")
 
-st.title("Dashboard de Carga e Geração do SIN  e Situação dos Reservatórios")
-
-# URLs das fontes de dados
-urls = {
-    'Eólica': "https://integra.ons.org.br/api/energiaagora/Get/Geracao_SIN_Eolica_json",
-    'Solar': "https://integra.ons.org.br/api/energiaagora/Get/Geracao_SIN_Solar_json",
-    'Hidráulica': "https://integra.ons.org.br/api/energiaagora/Get/Geracao_SIN_Hidraulica_json",
-    'Nuclear': "https://integra.ons.org.br/api/energiaagora/Get/Geracao_SIN_Nuclear_json",
-    'Térmica': "https://integra.ons.org.br/api/energiaagora/Get/Geracao_SIN_Termica_json"
-}
+st.markdown("<h1 style='text-align: center;'>Dashboard de Geração Elétrica do Brasil</h1>", unsafe_allow_html=True)
 
 # Função para carregar e preparar os dados
 def load_data():
+    urls = {
+        'Eólica': "https://integra.ons.org.br/api/energiaagora/Get/Geracao_SIN_Eolica_json",
+        'Solar': "https://integra.ons.org.br/api/energiaagora/Get/Geracao_SIN_Solar_json",
+        'Hidráulica': "https://integra.ons.org.br/api/energiaagora/Get/Geracao_SIN_Hidraulica_json",
+        'Nuclear': "https://integra.ons.org.br/api/energiaagora/Get/Geracao_SIN_Nuclear_json",
+        'Térmica': "https://integra.ons.org.br/api/energiaagora/Get/Geracao_SIN_Termica_json"
+    }
+    
     dataframes = {key: get_data(url) for key, url in urls.items()}
     dataframes = {key: df for key, df in dataframes.items() if df is not None}
     balanco = get_balanco_energetico()
@@ -86,19 +85,15 @@ def load_data():
 
 # Função para criar gráficos
 def create_charts(dataframes):
-    # Calcular o total de geração do SIN em GWh
-    total_sin_gwh = sum(df['geracao'].iloc[-1] * 60 for df in dataframes.values()) / 1_000  # Convertendo de MWh para GWh
+    total_sin_gwh = sum(df['geracao'].iloc[-1] * 60 for df in dataframes.values()) / 1_000
 
-    # Preparar dados para o gráfico de rosca
     df_total_geracao = pd.DataFrame({
         'Fonte': list(dataframes.keys()),
         'Geração (MW)': [df['geracao'].iloc[-1] for df in dataframes.values()]
     })
 
-    # Definindo cores personalizadas
     colors = ['#636EFA', '#EF553B', '#00CC96', '#AB63FA', '#FFA15A']
 
-    # Criar gráfico de rosca
     fig_rosca = go.Figure(data=[go.Pie(
         labels=[f'{row["Fonte"]}<br>{row["Geração (MW)"]:.2f} MW' for _, row in df_total_geracao.iterrows()], 
         values=df_total_geracao['Geração (MW)'], 
@@ -127,18 +122,14 @@ def create_charts(dataframes):
         plot_bgcolor='rgba(0,0,0,0)'
     )
 
-    # Gráfico de linha para Geração do SIN
     fig_sin = go.Figure()
 
-    # Adicionar cada fonte no gráfico de linha
     for fonte, df in dataframes.items():
         fig_sin.add_trace(go.Scatter(x=df['instante'], y=df['geracao'], mode='lines', name=fonte))
 
-    # Calcular a soma total das fontes ao longo do tempo
     df_total = pd.DataFrame(index=dataframes['Eólica']['instante'])
     df_total['Total'] = sum(df['geracao'] for df in dataframes.values())
 
-    # Adicionar a linha pontilhada com a soma total
     fig_sin.add_trace(go.Scatter(
         x=df_total.index, 
         y=df_total['Total'], 
@@ -158,7 +149,6 @@ def create_charts(dataframes):
         plot_bgcolor='rgba(0,0,0,0)'
     )
 
-    # Gráfico de barras para Geração por Fonte
     fig_barras = px.bar(
         df_total_geracao,
         x='Fonte',
@@ -215,10 +205,8 @@ def create_balanco_cards(balanco):
 # Função para exibir gráficos da situação dos reservatórios
 def create_reservatorios_charts(reservatorios):
     if reservatorios:
-        st.markdown("### Situação dos Reservatórios")
         df_reservatorios = pd.DataFrame(reservatorios)
 
-        # Gráfico de barras para a porcentagem de armazenamento de cada reservatório
         fig_reserv_percent = px.bar(
             df_reservatorios, 
             x="Reservatorio", 
@@ -234,7 +222,6 @@ def create_reservatorios_charts(reservatorios):
             height=400
         )
 
-        # Gráfico de barras para a EAR verificada em MWmês
         fig_reserv_ear = px.bar(
             df_reservatorios, 
             x="Reservatorio", 
@@ -250,8 +237,7 @@ def create_reservatorios_charts(reservatorios):
             height=400
         )
 
-        st.plotly_chart(fig_reserv_percent, use_container_width=True)
-        st.plotly_chart(fig_reserv_ear, use_container_width=True)
+        return fig_reserv_percent, fig_reserv_ear
 
 # Layout principal
 st.markdown("### Métricas Principais de Geração de Energia")
@@ -259,24 +245,21 @@ dataframes, balanco, balanco_consolidado, reservatorios = load_data()
 create_balanco_cards(balanco)
 
 st.markdown("### Distribuição e Evolução da Geração de Energia")
-col1, col2 = st.columns([1, 1.5])
+col1, col2 = st.columns(2)
 
 # Gráfico de Rosca e Gráfico de Linhas
 fig_rosca, fig_sin, fig_barras = create_charts(dataframes)
+fig_reserv_percent, fig_reserv_ear = create_reservatorios_charts(reservatorios)
 
 with col1:
     st.plotly_chart(fig_rosca, use_container_width=True)
+    st.plotly_chart(fig_barras, use_container_width=True)
 
 with col2:
     st.plotly_chart(fig_sin, use_container_width=True)
+    st.plotly_chart(fig_reserv_percent, use_container_width=True)
+    st.plotly_chart(fig_reserv_ear, use_container_width=True)
 
-# Gráfico de Barras
-st.markdown("### Comparação de Geração por Fonte")
-st.plotly_chart(fig_barras, use_container_width=True)
-
-# Exibir gráficos da situação dos reservatórios
-create_reservatorios_charts(reservatorios)
-
+# Atualização automática a cada 10 minutos (600 segundos)
 time.sleep(600)
-# Atualização automática dos dados
 st.experimental_rerun()
