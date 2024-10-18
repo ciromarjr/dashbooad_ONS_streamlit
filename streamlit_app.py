@@ -64,7 +64,7 @@ def get_situacao_reservatorios():
 # Configuração da página
 st.set_page_config(page_title="Geração Elétrica e Reservatórios", page_icon="⚡", layout="wide")
 
-st.markdown("<h1 style='text-align: center;'>Dashboard de Geração Elétrica do Brasil</h1>", unsafe_allow_html=True)
+st.markdown("<h1 style='text-align: center;'>Dashboard de Carga e Geração do SIN</h1>", unsafe_allow_html=True)
 
 # Função para carregar e preparar os dados
 def load_data():
