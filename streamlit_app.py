@@ -55,6 +55,13 @@ st.set_page_config(page_title="Geração Elétrica e Reservatórios", page_icon=
 
 st.markdown("<h1 style='text-align: center;'>Dashboard de Carga e Geração do SIN</h1>", unsafe_allow_html=True)
 
+# Intervalo de atualização personalizável
+refresh_interval = st.sidebar.slider('Intervalo de Atualização (segundos)', min_value=60, max_value=3600, value=600)
+
+# Filtros interativos para fontes de energia
+selected_sources = st.sidebar.multiselect('Selecione as Fontes de Energia', ['Eólica', 'Solar', 'Hidráulica', 'Nuclear', 'Térmica'], default=['Eólica', 'Solar', 'Hidráulica', 'Nuclear', 'Térmica'])
+selected_regions = st.sidebar.multiselect('Selecione as Regiões', ['Norte', 'Nordeste', 'Sudeste/Centro-Oeste', 'Sul'], default=['Norte', 'Nordeste', 'Sudeste/Centro-Oeste', 'Sul'])
+
 # Função para carregar e preparar os dados
 def load_data():
     urls = {
@@ -64,8 +71,9 @@ def load_data():
         'Nuclear': "https://integra.ons.org.br/api/energiaagora/Get/Geracao_SIN_Nuclear_json",
         'Térmica': "https://integra.ons.org.br/api/energiaagora/Get/Geracao_SIN_Termica_json"
     }
-    
-    dataframes = {key: get_data(url) for key, url in urls.items()}
+
+    # Filtrar fontes selecionadas
+    dataframes = {key: get_data(url) for key, url in urls.items() if key in selected_sources}
     dataframes = {key: df for key, df in dataframes.items() if df is not None}
     balanco = get_balanco_energetico()
     reservatorios = get_situacao_reservatorios()
@@ -80,7 +88,7 @@ def create_charts(dataframes):
         'Geração (MW)': [df['geracao'].iloc[-1] for df in dataframes.values()]
     })
 
-    colors = ['#636EFA', '#EF553B', '#00CC96', '#AB63FA', '#FFA15A']
+    colors = ['#FF6F61', '#6B5B95', '#88B04B', '#F7CAC9', '#92A8D1']
 
     # Gráfico de Rosca - Distribuição de Geração por Fonte
     fig_rosca = go.Figure(data=[go.Pie(
@@ -129,11 +137,21 @@ def create_charts(dataframes):
         line=dict(color='white', width=4, dash='dash')  # Linha total em branco e tracejada
     ))
 
+    # Adicionando uma linha de tendência
+    fig_sin.add_trace(go.Scatter(
+        x=df_total.index,
+        y=df_total['Total'].rolling(window=5).mean(),
+        mode='lines',
+        name='Tendência',
+        line=dict(dash='dot', color='blue')
+    ))
+
     fig_sin.update_layout(
         legend=dict(font=dict(size=14)),
         title='Evolução Temporal da Geração por Fonte',
         xaxis_title='Instante',
         yaxis_title='Geração (MW)',
+        yaxis_tickformat="~s",  # Formatação para números grandes
         height=400,
         margin=dict(t=50, b=50, l=50, r=50),
         paper_bgcolor='rgba(0,0,0,0)',
@@ -155,14 +173,14 @@ def create_charts(dataframes):
     fig_barras.update_layout(
         margin=dict(t=50, b=50, l=50, r=50),
         paper_bgcolor='rgba(0,0,0,0)',
-        plot_bgcolor='rgba(0,0,0,0)'
+        plot_bgcolor='rgba(0,0,0,0)',
+        yaxis_tickformat="~s"  # Formatação para números grandes
     )
 
     return fig_rosca, fig_sin, fig_barras
 
 # Função para criar gráfico de Geração por Região
 def create_regional_chart():
-    # Geração por Região em um único gráfico
     df_region_dataframes = {
         'Eólica Norte': get_data("https://integra.ons.org.br/api/energiaagora/Get/Geracao_Norte_Eolica_json"),
         'Solar Norte': get_data("https://integra.ons.org.br/api/energiaagora/Get/Geracao_Norte_Solar_json"),
@@ -171,19 +189,9 @@ def create_regional_chart():
         'Eólica Sudeste/Centro-Oeste': get_data("https://integra.ons.org.br/api/energiaagora/Get/Geracao_SudesteECentroOeste_Eolica_json"),
         'Solar Sudeste/Centro-Oeste': get_data("https://integra.ons.org.br/api/energiaagora/Get/Geracao_SudesteECentroOeste_Solar_json"),
         'Eólica Sul': get_data("https://integra.ons.org.br/api/energiaagora/Get/Geracao_Sul_Eolica_json"),
-        'Solar Sul': get_data("https://integra.ons.org.br/api/energiaagora/Get/Geracao_Sul_Solar_json"),
-        'Norte Hidráulica': get_data("https://integra.ons.org.br/api/energiaagora/Get/Geracao_Norte_Hidraulica_json"),
-        'Norte Nuclear': get_data("https://integra.ons.org.br/api/energiaagora/Get/Geracao_Norte_Nuclear_json"),
-        'Norte Térmica': get_data("https://integra.ons.org.br/api/energiaagora/Get/Geracao_Norte_Termica_json"),
-        'Nordeste Hidráulica': get_data("https://integra.ons.org.br/api/energiaagora/Get/Geracao_Nordeste_Hidraulica_json"),
-        'Nordeste Nuclear': get_data("https://integra.ons.org.br/api/energiaagora/Get/Geracao_Nordeste_Nuclear_json"),
-        'Nordeste Térmica': get_data("https://integra.ons.org.br/api/energiaagora/Get/Geracao_Nordeste_Termica_json"),
-        'Sudeste/Centro-Oeste Hidráulica': get_data("https://integra.ons.org.br/api/energiaagora/Get/Geracao_SudesteECentroOeste_Hidraulica_json"),
-        'Sudeste/Centro-Oeste Nuclear': get_data("https://integra.ons.org.br/api/energiaagora/Get/Geracao_SudesteECentroOeste_Nuclear_json"),
-        'Sudeste/Centro-Oeste Térmica': get_data("https://integra.ons.org.br/api/energiaagora/Get/Geracao_SudesteECentroOeste_Termica_json")
+        'Solar Sul': get_data("https://integra.ons.org.br/api/energiaagora/Get/Geracao_Sul_Solar_json")
     }
 
-    # Remover entradas com dados inválidos (None)
     df_region_dataframes = {key: df for key, df in df_region_dataframes.items() if df is not None}
 
     fig_regiao = go.Figure()
@@ -199,7 +207,7 @@ def create_regional_chart():
         y=df_total_regional['Total'], 
         mode='lines', 
         name='Total',
-        line=dict(color='white', width=4, dash='dash')  # Linha total em branco e tracejada
+        line=dict(color='white', width=4, dash='dash')
     ))
 
     fig_regiao.update_layout(
@@ -207,6 +215,7 @@ def create_regional_chart():
         title='Geração por Região',
         xaxis_title='Instante',
         yaxis_title='Geração (MW)',
+        yaxis_tickformat="~s",
         height=400,
         margin=dict(t=50, b=50, l=50, r=50),
         paper_bgcolor='rgba(0,0,0,0)',
@@ -252,72 +261,17 @@ def create_reservatorios_charts(reservatorios):
 
         return fig_reserv_percent, fig_reserv_ear
 
-# Função para criar gráfico de Balanço Energético
-def create_balanco_chart(balanco):
-    if balanco:
-        df_balanco = pd.DataFrame({
-            'Região': ['Sudeste/Centro-Oeste', 'Sul', 'Nordeste', 'Norte'],
-            'Geração Total (MW)': [
-                round(balanco['sudesteECentroOeste']['geracao']['total'], 2),
-                round(balanco['sul']['geracao']['total'], 2),
-                round(balanco['nordeste']['geracao']['total'], 2),
-                round(balanco['norte']['geracao']['total'], 2)
-            ],
-            'Carga Verificada (MW)': [
-                round(balanco['sudesteECentroOeste']['cargaVerificada'], 2),
-                round(balanco['sul']['cargaVerificada'], 2),
-                round(balanco['nordeste']['cargaVerificada'], 2),
-                round(balanco['norte']['cargaVerificada'], 2)
-            ],
-            'Importação (MW)': [
-                round(balanco['sudesteECentroOeste']['importacao'], 2),
-                round(balanco['sul']['importacao'], 2),
-                round(balanco['nordeste']['importacao'], 2),
-                round(balanco['norte']['importacao'], 2)
-            ],
-            'Exportação (MW)': [
-                round(balanco['sudesteECentroOeste']['exportacao'], 2),
-                round(balanco['sul']['exportacao'], 2),
-                round(balanco['nordeste']['exportacao'], 2),
-                round(balanco['norte']['exportacao'], 2)
-            ]
-        })
-
-        fig_balanco = px.bar(
-            df_balanco.melt(id_vars=['Região'], value_vars=['Geração Total (MW)', 'Carga Verificada (MW)', 'Importação (MW)', 'Exportação (MW)']),
-            x='Região',
-            y='value',
-            color='variable',
-            barmode='group',
-            text='value',
-            title="Balanço Energético por Região"
-        )
-
-        fig_balanco.update_layout(
-            xaxis_title="Região",
-            yaxis_title="Valores (MW)",
-            height=400,
-            margin=dict(t=50, b=50, l=50, r=50),
-            paper_bgcolor='rgba(0,0,0,0)',
-            plot_bgcolor='rgba(0,0,0,0)'
-        )
-        return fig_balanco
-
 # Layout principal
 st.markdown("### Métricas Principais de Geração de Energia")
 dataframes, balanco, reservatorios = load_data()
-
-# Gráfico de Balanço Energético
-fig_balanco = create_balanco_chart(balanco)
-st.plotly_chart(fig_balanco, use_container_width=True)
 
 # Gráfico de Rosca, Linhas e Barras
 fig_rosca, fig_sin, fig_barras = create_charts(dataframes)
 fig_regiao = create_regional_chart()
 fig_reserv_percent, fig_reserv_ear = create_reservatorios_charts(reservatorios)
 
-st.markdown("### Distribuição e Evolução da Geração de Energia")
-col1, col2 = st.columns(2)
+# Layout responsivo para telas menores
+col1, col2 = st.columns(1 if st.sidebar.checkbox("Empilhar Gráficos") else 2)
 
 with col1:
     st.plotly_chart(fig_rosca, use_container_width=True)
@@ -329,7 +283,7 @@ with col2:
 
 # Gráficos dos reservatórios
 st.markdown("### Situação dos Reservatórios")
-col3, col4 = st.columns(2)
+col3, col4 = st.columns(1 if st.sidebar.checkbox("Empilhar Gráficos Reservatórios") else 2)
 
 with col3:
     st.plotly_chart(fig_reserv_percent, use_container_width=True)
@@ -337,6 +291,6 @@ with col3:
 with col4:
     st.plotly_chart(fig_reserv_ear, use_container_width=True)
 
-# Atualização automática a cada 10 minutos (600 segundos)
-time.sleep(600)
+# Atualização automática com intervalo personalizável
+time.sleep(refresh_interval)
 st.experimental_rerun()
