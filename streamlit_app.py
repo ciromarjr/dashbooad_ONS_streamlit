@@ -53,7 +53,7 @@ def get_situacao_reservatorios():
 # Configuração da página
 st.set_page_config(page_title="Geração Elétrica e Reservatórios", page_icon="⚡", layout="wide")
 
-st.markdown("<h1 style='text-align: center;'>Dashboard de Carga e Geração do SIN</h1>", unsafe_allow_html=True)
+st.markdown("<h1 style='text-align: center;'>Dashboard de Carga e Geração do SIN Nordeste</h1>", unsafe_allow_html=True)
 
 # Intervalo de atualização personalizável
 refresh_interval = st.sidebar.slider('Intervalo de Atualização (segundos)', min_value=60, max_value=3600, value=600)
@@ -210,7 +210,7 @@ def create_charts(dataframes):
     return fig_rosca, fig_sin, fig_barras
 
 # Layout principal
-st.markdown("### Métricas Principais de Geração de Energia")
+#st.markdown("### Métricas Principais de Geração de Energia")
 dataframes, balanco, reservatorios = load_data()
 
 # Gráfico de Rosca, Linhas e Barras
