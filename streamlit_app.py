@@ -60,21 +60,51 @@ refresh_interval = st.sidebar.slider('Intervalo de Atualização (segundos)', mi
 
 # Filtros interativos para fontes de energia
 selected_sources = st.sidebar.multiselect('Selecione as Fontes de Energia', ['Eólica', 'Solar', 'Hidráulica', 'Nuclear', 'Térmica'], default=['Eólica', 'Solar', 'Hidráulica', 'Nuclear', 'Térmica'])
-selected_regions = st.sidebar.multiselect('Selecione as Regiões', ['Norte', 'Nordeste', 'Sudeste/Centro-Oeste', 'Sul'], default=['Norte', 'Nordeste', 'Sudeste/Centro-Oeste', 'Sul'])
+selected_regions = st.sidebar.multiselect('Selecione as Regiões', ['Norte', 'Nordeste', 'Sudeste/Centro-Oeste', 'Sul'], default=['Nordeste'])
 
 # Função para carregar e preparar os dados
 def load_data():
     urls = {
-        'Eólica': "https://integra.ons.org.br/api/energiaagora/Get/Geracao_SIN_Eolica_json",
-        'Solar': "https://integra.ons.org.br/api/energiaagora/Get/Geracao_SIN_Solar_json",
-        'Hidráulica': "https://integra.ons.org.br/api/energiaagora/Get/Geracao_SIN_Hidraulica_json",
-        'Nuclear': "https://integra.ons.org.br/api/energiaagora/Get/Geracao_SIN_Nuclear_json",
-        'Térmica': "https://integra.ons.org.br/api/energiaagora/Get/Geracao_SIN_Termica_json"
+        'Eólica': {
+            'Norte': "https://integra.ons.org.br/api/energiaagora/Get/Geracao_Norte_Eolica_json",
+            'Nordeste': "https://integra.ons.org.br/api/energiaagora/Get/Geracao_Nordeste_Eolica_json",
+            'Sudeste/Centro-Oeste': "https://integra.ons.org.br/api/energiaagora/Get/Geracao_SudesteECentroOeste_Eolica_json",
+            'Sul': "https://integra.ons.org.br/api/energiaagora/Get/Geracao_Sul_Eolica_json"
+        },
+        'Solar': {
+            'Norte': "https://integra.ons.org.br/api/energiaagora/Get/Geracao_Norte_Solar_json",
+            'Nordeste': "https://integra.ons.org.br/api/energiaagora/Get/Geracao_Nordeste_Solar_json",
+            'Sudeste/Centro-Oeste': "https://integra.ons.org.br/api/energiaagora/Get/Geracao_SudesteECentroOeste_Solar_json",
+            'Sul': "https://integra.ons.org.br/api/energiaagora/Get/Geracao_Sul_Solar_json"
+        },
+        'Hidráulica': {
+            'Norte': "https://integra.ons.org.br/api/energiaagora/Get/Geracao_Norte_Hidraulica_json",
+            'Nordeste': "https://integra.ons.org.br/api/energiaagora/Get/Geracao_Nordeste_Hidraulica_json",
+            'Sudeste/Centro-Oeste': "https://integra.ons.org.br/api/energiaagora/Get/Geracao_SudesteECentroOeste_Hidraulica_json",
+            'Sul': "https://integra.ons.org.br/api/energiaagora/Get/Geracao_Sul_Hidraulica_json"
+        },
+        'Nuclear': {
+            'Sudeste/Centro-Oeste': "https://integra.ons.org.br/api/energiaagora/Get/Geracao_SudesteECentroOeste_Nuclear_json"
+        },
+        'Térmica': {
+            'Norte': "https://integra.ons.org.br/api/energiaagora/Get/Geracao_Norte_Termica_json",
+            'Nordeste': "https://integra.ons.org.br/api/energiaagora/Get/Geracao_Nordeste_Termica_json",
+            'Sudeste/Centro-Oeste': "https://integra.ons.org.br/api/energiaagora/Get/Geracao_SudesteECentroOeste_Termica_json",
+            'Sul': "https://integra.ons.org.br/api/energiaagora/Get/Geracao_Sul_Termica_json"
+        }
     }
 
-    # Filtrar fontes selecionadas
-    dataframes = {key: get_data(url) for key, url in urls.items() if key in selected_sources}
-    dataframes = {key: df for key, df in dataframes.items() if df is not None}
+    # Filtrar as fontes e regiões selecionadas
+    dataframes = {}
+    for fonte in selected_sources:
+        for regiao in selected_regions:
+            if fonte in urls and regiao in urls[fonte]:
+                url = urls[fonte][regiao]
+                df = get_data(url)
+                if df is not None:
+                    key = f'{fonte} - {regiao}'
+                    dataframes[key] = df
+
     balanco = get_balanco_energetico()
     reservatorios = get_situacao_reservatorios()
     return dataframes, balanco, reservatorios
@@ -126,7 +156,7 @@ def create_charts(dataframes):
         fig_sin.add_trace(go.Scatter(x=df['instante'], y=df['geracao'], mode='lines', name=fonte))
 
     # Adiciona a linha total (soma de todas as gerações)
-    df_total = pd.DataFrame(index=dataframes['Eólica']['instante'])
+    df_total = pd.DataFrame(index=dataframes[next(iter(dataframes))]['instante'])
     df_total['Total'] = sum(df['geracao'] for df in dataframes.values())
 
     fig_sin.add_trace(go.Scatter(
@@ -179,96 +209,12 @@ def create_charts(dataframes):
 
     return fig_rosca, fig_sin, fig_barras
 
-# Função para criar gráfico de Geração por Região
-def create_regional_chart():
-    df_region_dataframes = {
-        'Eólica Norte': get_data("https://integra.ons.org.br/api/energiaagora/Get/Geracao_Norte_Eolica_json"),
-        'Solar Norte': get_data("https://integra.ons.org.br/api/energiaagora/Get/Geracao_Norte_Solar_json"),
-        'Eólica Nordeste': get_data("https://integra.ons.org.br/api/energiaagora/Get/Geracao_Nordeste_Eolica_json"),
-        'Solar Nordeste': get_data("https://integra.ons.org.br/api/energiaagora/Get/Geracao_Nordeste_Solar_json"),
-        'Eólica Sudeste/Centro-Oeste': get_data("https://integra.ons.org.br/api/energiaagora/Get/Geracao_SudesteECentroOeste_Eolica_json"),
-        'Solar Sudeste/Centro-Oeste': get_data("https://integra.ons.org.br/api/energiaagora/Get/Geracao_SudesteECentroOeste_Solar_json"),
-        'Eólica Sul': get_data("https://integra.ons.org.br/api/energiaagora/Get/Geracao_Sul_Eolica_json"),
-        'Solar Sul': get_data("https://integra.ons.org.br/api/energiaagora/Get/Geracao_Sul_Solar_json")
-    }
-
-    df_region_dataframes = {key: df for key, df in df_region_dataframes.items() if df is not None}
-
-    fig_regiao = go.Figure()
-    for fonte, df in df_region_dataframes.items():
-        fig_regiao.add_trace(go.Scatter(x=df['instante'], y=df['geracao'], mode='lines', name=fonte))
-
-    # Adicionar a linha total (soma de todas as gerações por região)
-    df_total_regional = pd.DataFrame(index=df_region_dataframes['Eólica Norte']['instante'])
-    df_total_regional['Total'] = sum(df['geracao'] for df in df_region_dataframes.values())
-    
-    fig_regiao.add_trace(go.Scatter(
-        x=df_total_regional.index, 
-        y=df_total_regional['Total'], 
-        mode='lines', 
-        name='Total',
-        line=dict(color='white', width=4, dash='dash')
-    ))
-
-    fig_regiao.update_layout(
-        legend=dict(font=dict(size=14)),
-        title='Geração por Região',
-        xaxis_title='Instante',
-        yaxis_title='Geração (MW)',
-        yaxis_tickformat="~s",
-        height=400,
-        margin=dict(t=50, b=50, l=50, r=50),
-        paper_bgcolor='rgba(0,0,0,0)',
-        plot_bgcolor='rgba(0,0,0,0)'
-    )
-
-    return fig_regiao
-
-# Função para exibir gráficos da situação dos reservatórios
-def create_reservatorios_charts(reservatorios):
-    if reservatorios:
-        df_reservatorios = pd.DataFrame(reservatorios)
-
-        fig_reserv_percent = px.bar(
-            df_reservatorios, 
-            x="Reservatorio", 
-            y="ReservatorioPorcentagem", 
-            color="Subsistema", 
-            title="Percentual de Ocupação dos Reservatórios",
-            text="ReservatorioPorcentagem"
-        )
-        fig_reserv_percent.update_traces(texttemplate='%{text:.2f}%', textposition='outside')
-        fig_reserv_percent.update_layout(
-            xaxis_title="Reservatório",
-            yaxis_title="Porcentagem (%)",
-            height=400
-        )
-
-        fig_reserv_ear = px.bar(
-            df_reservatorios, 
-            x="Reservatorio", 
-            y="ReservatorioEARVerificadaMWMes", 
-            color="Subsistema", 
-            title="EAR Verificada dos Reservatórios em MWmês",
-            text="ReservatorioEARVerificadaMWMes"
-        )
-        fig_reserv_ear.update_traces(texttemplate='%{text:.2f}', textposition='outside')
-        fig_reserv_ear.update_layout(
-            xaxis_title="Reservatório",
-            yaxis_title="MWmês",
-            height=400
-        )
-
-        return fig_reserv_percent, fig_reserv_ear
-
 # Layout principal
 st.markdown("### Métricas Principais de Geração de Energia")
 dataframes, balanco, reservatorios = load_data()
 
 # Gráfico de Rosca, Linhas e Barras
 fig_rosca, fig_sin, fig_barras = create_charts(dataframes)
-fig_regiao = create_regional_chart()
-fig_reserv_percent, fig_reserv_ear = create_reservatorios_charts(reservatorios)
 
 # Layout responsivo para telas menores
 col1, col2 = st.columns(1 if st.sidebar.checkbox("Empilhar Gráficos") else 2)
@@ -279,17 +225,6 @@ with col1:
 
 with col2:
     st.plotly_chart(fig_sin, use_container_width=True)
-    st.plotly_chart(fig_regiao, use_container_width=True)
-
-# Gráficos dos reservatórios
-st.markdown("### Situação dos Reservatórios")
-col3, col4 = st.columns(1 if st.sidebar.checkbox("Empilhar Gráficos Reservatórios") else 2)
-
-with col3:
-    st.plotly_chart(fig_reserv_percent, use_container_width=True)
-
-with col4:
-    st.plotly_chart(fig_reserv_ear, use_container_width=True)
 
 # Atualização automática com intervalo personalizável
 time.sleep(refresh_interval)
