@@ -1,31 +1,102 @@
-import requests
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
-import plotly.express as px
-from datetime import datetime
-import time
+import requests
+from datetime import datetime, timedelta
+import numpy as np
 
-# Função para obter dados e cachear por 20 segundos
+# Configuração da página
+st.set_page_config(
+    page_title="Sistema Elétrico Brasileiro",
+    layout="wide",
+    initial_sidebar_state="collapsed"
+)
+
+# Cores e estilos
+BACKGROUND_COLOR = "#111827"
+CARD_COLOR = "#1F2937"
+TEXT_COLOR = "#F9FAFB"
+GRID_COLOR = "#374151"
+
+# API Configuration para obter previsão de geração
+AUTH_URL = "https://integra.ons.org.br/api/autenticar"
+PREV_GERACAO_URL = "https://integra.ons.org.br/api/programacao/repdoe/CargaMedioDiario?Ano=2024&Mes=11&Dia=15"
+AUTH_PAYLOAD = {
+    "usuario": "",
+    "senha": ""
+}
+def chunk_list(lst, n):
+    return [lst[i:i + n] for i in range(0, len(lst), n)]
+def get_usina_generation_forecast(token, date, usinas):
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {token}"
+    }
+    all_data = []
+    
+    payload = {
+            "Ano": date.year,
+            "Mes": date.month,
+            "Dia": date.day,
+            
+        }
+    response = requests.post(PREV_GERACAO_URL, json=payload, headers=headers)
+    if response.status_code == 200:
+            all_data.extend(response.json().get("Usinas", []))
+    else:
+            print(f"Error in request: {response.status_code}")
+            return None
+            
+    return all_data
+
+
+# Funções de obtenção de dados Carga
 @st.cache_data(ttl=20)
 def get_data(url):
     try:
         response = requests.get(url)
         if response.status_code == 200:
             if response.content and response.content.strip():
-                try:
-                    data = response.json()
-                    if isinstance(data, list) and data:
-                        df = pd.DataFrame(data)
-                        if not df.empty:
-                            df['instante'] = pd.to_datetime(df['instante'], errors='coerce')
-                            df = df.dropna(subset=['instante'])
-                            df['geracao'] = df['geracao'] / 60  # Convertendo de MWh para MW
-                            return df
-                except ValueError:
-                    print(f"Erro ao decodificar JSON de {url}")
+                data = response.json()
+                if isinstance(data, list) and data:
+                    df = pd.DataFrame(data)
+                    if not df.empty:
+                        df['instante'] = pd.to_datetime(df['instante'], errors='coerce')
+                        df = df.dropna(subset=['instante'])
+                        df['carga'] = df['carga'] # / 60  Convertendo de MWh para MW
+                        return df
     except Exception as e:
-        print(f"Erro ao carregar dados de {url}: {e}")
+        st.error(f"Erro ao carregar dados: {e}")
+    return None
+
+# Funções de obtenção de dados Geração
+@st.cache_data(ttl=20)
+def get_data(url):
+    try:
+        response = requests.get(url)
+        if response.status_code == 200:
+            if response.content and response.content.strip():
+                data = response.json()
+                if isinstance(data, list) and data:
+                    df = pd.DataFrame(data)
+                    if not df.empty:
+                        df['instante'] = pd.to_datetime(df['instante'], errors='coerce')
+                        df = df.dropna(subset=['instante'])
+                        df['geracao'] = df['geracao'] # / 60  Convertendo de MWh para MW
+                        return df
+    except Exception as e:
+        st.error(f"Erro ao carregar dados: {e}")
+    return None
+
+@st.cache_data(ttl=20)
+def get_carga_subsistema():
+    url = "https://integra.ons.org.br/api/energiaagora/Get/Carga_SIN_json"
+    try:
+        response = requests.get(url)
+        if response.status_code == 200:
+            return response.json()
+    except Exception as e:
+        st.error(f"Erro ao carregar Carga subsistema: {e}")
     return None
 
 @st.cache_data(ttl=20)
@@ -36,7 +107,7 @@ def get_balanco_energetico():
         if response.status_code == 200:
             return response.json()
     except Exception as e:
-        print(f"Erro ao carregar balanço energético: {e}")
+        st.error(f"Erro ao carregar balanço energético: {e}")
     return None
 
 @st.cache_data(ttl=20)
@@ -47,22 +118,9 @@ def get_situacao_reservatorios():
         if response.status_code == 200:
             return response.json()
     except Exception as e:
-        print(f"Erro ao carregar a situação dos reservatórios: {e}")
+        st.error(f"Erro ao carregar situação dos reservatórios: {e}")
     return None
 
-# Configuração da página
-st.set_page_config(page_title="Geração Elétrica e Reservatórios", page_icon="⚡", layout="wide")
-
-st.markdown("<h1 style='text-align: center;'>Dashboard de Carga e Geração do SIN Nordeste</h1>", unsafe_allow_html=True)
-
-# Intervalo de atualização personalizável
-refresh_interval = st.sidebar.slider('Intervalo de Atualização (segundos)', min_value=60, max_value=3600, value=600)
-
-# Filtros interativos para fontes de energia
-selected_sources = st.sidebar.multiselect('Selecione as Fontes de Energia', ['Eólica', 'Solar', 'Hidráulica', 'Nuclear', 'Térmica'], default=['Eólica', 'Solar', 'Hidráulica', 'Nuclear', 'Térmica'])
-selected_regions = st.sidebar.multiselect('Selecione as Regiões', ['Norte', 'Nordeste', 'Sudeste/Centro-Oeste', 'Sul'], default=['Nordeste'])
-
-# Função para carregar e preparar os dados
 def load_data():
     urls = {
         'Eólica': {
@@ -93,139 +151,319 @@ def load_data():
             'Sul': "https://integra.ons.org.br/api/energiaagora/Get/Geracao_Sul_Termica_json"
         }
     }
-
-    # Filtrar as fontes e regiões selecionadas
+    
     dataframes = {}
-    for fonte in selected_sources:
-        for regiao in selected_regions:
-            if fonte in urls and regiao in urls[fonte]:
-                url = urls[fonte][regiao]
-                df = get_data(url)
-                if df is not None:
-                    key = f'{fonte} - {regiao}'
-                    dataframes[key] = df
-
+    for fonte, regioes in urls.items():
+        for regiao, url in regioes.items():
+            df = get_data(url)
+            if df is not None:
+                key = f'{fonte} - {regiao}'
+                dataframes[key] = df
+    
     balanco = get_balanco_energetico()
     reservatorios = get_situacao_reservatorios()
+    
     return dataframes, balanco, reservatorios
 
-# Função para criar gráficos
-def create_charts(dataframes):
-    total_sin_gwh = sum(df['geracao'].iloc[-1] * 60 for df in dataframes.values()) / 1_000
+# Função para processar dados
+def process_data(dataframes):
+    if not dataframes:
+        return None, None, None, None
+    
+    # Agregando dados por fonte
+    fonte_totals = {}
+    for key, df in dataframes.items():
+        fonte = key.split(' - ')[0]
+        if fonte not in fonte_totals:
+            fonte_totals[fonte] = df['geracao'].iloc[-1] if not df.empty else 0
+        else:
+            fonte_totals[fonte] += df['geracao'].iloc[-1] if not df.empty else 0
+    
+    # Preparando dados para gráfico de 24h
+    timeline_data = {}
+    for key, df in dataframes.items():
+        fonte = key.split(' - ')[0]
+        if not df.empty:
+            if fonte not in timeline_data:
+                timeline_data[fonte] = df.copy()
+            else:
+                timeline_data[fonte]['geracao'] += df['geracao']
+    
+    return fonte_totals, timeline_data
 
-    df_total_geracao = pd.DataFrame({
-        'Fonte': list(dataframes.keys()),
-        'Geração (MW)': [df['geracao'].iloc[-1] for df in dataframes.values()]
-    })
-
-    colors = ['#FF6F61', '#6B5B95', '#88B04B', '#F7CAC9', '#92A8D1']
-
-    # Gráfico de Rosca - Distribuição de Geração por Fonte
-    fig_rosca = go.Figure(data=[go.Pie(
-        labels=[f'{row["Fonte"]}<br>{row["Geração (MW)"]:.2f} MW' for _, row in df_total_geracao.iterrows()], 
-        values=df_total_geracao['Geração (MW)'], 
-        hole=.6,
-        hoverinfo='label+percent+value',
-        textfont_size=18,
-        marker=dict(colors=colors)
-    )])
-
-    fig_rosca.add_annotation(
-        dict(
-            text=f'{total_sin_gwh:.2f} GW',
-            x=0.5,
-            y=0.5,
-            font_size=40,
-            showarrow=False
-        )
-    )
-
-    fig_rosca.update_layout(
-        title_text='Distribuição de Geração por Fonte',
-        annotations=[dict(text=f'{total_sin_gwh:.2f} GW', x=0.5, y=0.5, font_size=30, showarrow=False)],
-        height=400,
-        margin=dict(t=50, b=50, l=50, r=50),
-        paper_bgcolor='rgba(0,0,0,0)',
-        plot_bgcolor='rgba(0,0,0,0)'
-    )
-
-    # Gráfico de Linhas - Evolução da Geração por Fonte com a linha total
-    fig_sin = go.Figure()
-
-    for fonte, df in dataframes.items():
-        fig_sin.add_trace(go.Scatter(x=df['instante'], y=df['geracao'], mode='lines', name=fonte))
-
-    # Adiciona a linha total (soma de todas as gerações)
-    df_total = pd.DataFrame(index=dataframes[next(iter(dataframes))]['instante'])
-    df_total['Total'] = sum(df['geracao'] for df in dataframes.values())
-
-    fig_sin.add_trace(go.Scatter(
-        x=df_total.index, 
-        y=df_total['Total'], 
-        mode='lines', 
-        name='Total',
-        line=dict(color='white', width=4, dash='dash')  # Linha total em branco e tracejada
-    ))
-
-    # Adicionando uma linha de tendência
-    fig_sin.add_trace(go.Scatter(
-        x=df_total.index,
-        y=df_total['Total'].rolling(window=5).mean(),
-        mode='lines',
-        name='Tendência',
-        line=dict(dash='dot', color='blue')
-    ))
-
-    fig_sin.update_layout(
-        legend=dict(font=dict(size=14)),
-        title='Evolução Temporal da Geração por Fonte',
-        xaxis_title='Instante',
-        yaxis_title='Geração (MW)',
-        yaxis_tickformat="~s",  # Formatação para números grandes
-        height=400,
-        margin=dict(t=50, b=50, l=50, r=50),
-        paper_bgcolor='rgba(0,0,0,0)',
-        plot_bgcolor='rgba(0,0,0,0)'
-    )
-
-    # Gráfico de Barras - Comparação de Geração por Fonte
-    fig_barras = px.bar(
-        df_total_geracao,
-        x='Fonte',
-        y='Geração (MW)',
-        text='Geração (MW)',
-        title="Comparação de Geração por Fonte",
-        color='Fonte',
-        height=400,
-        color_discrete_sequence=colors
-    )
-    fig_barras.update_traces(texttemplate='%{text:.2f}', textposition='outside')
-    fig_barras.update_layout(
-        margin=dict(t=50, b=50, l=50, r=50),
-        paper_bgcolor='rgba(0,0,0,0)',
-        plot_bgcolor='rgba(0,0,0,0)',
-        yaxis_tickformat="~s"  # Formatação para números grandes
-    )
-
-    return fig_rosca, fig_sin, fig_barras
-
-# Layout principal
-#st.markdown("### Métricas Principais de Geração de Energia")
+# Carregando dados
 dataframes, balanco, reservatorios = load_data()
+fonte_totals, timeline_data = process_data(dataframes)
+# Estilo personalizado para o tema dark
+st.markdown("""
+    <style>
+    .main {
+        background-color: #111827;
+    }
+    .stApp {
+        background-color: #111827;
+    }
+    .stMetric {
+        background-color: #1F2937;
+        padding: 20px;
+        border-radius: 12px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        color: #F9FAFB !important;
+    }
+    .css-1r6slb0 {
+        background-color: #1F2937;
+        border-radius: 12px;
+        padding: 24px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+    }
+    h1, h2, h3, h4, h5, h6, .metric-label {
+        color: #F9FAFB !important;
+    }
+    .metric-value {
+        color: #F9FAFB !important;
+    }
+    div[data-testid="stMetricValue"] {
+        color: #F9FAFB !important;
+    }
+    div[data-testid="stMetricLabel"] > label {
+        color: #9CA3AF !important;
+    }
+    .stMetric:hover {
+        transform: translateY(-2px);
+        transition: all 0.3s ease;
+    }
+    .plot-container {
+        background-color: #1F2937;
+        border-radius: 12px;
+        padding: 20px;
+        margin: 10px 0;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+    }
+    .status-card {
+        background-color: #1F2937;
+        padding: 15px;
+        border-radius: 10px;
+        margin: 5px 0;
+    }
+    .status-card:hover {
+        transform: translateY(-2px);
+        transition: all 0.3s ease;
+    }
+    </style>
+""", unsafe_allow_html=True)
 
-# Gráfico de Rosca, Linhas e Barras
-fig_rosca, fig_sin, fig_barras = create_charts(dataframes)
+# Header do Dashboard
+st.markdown("""
+    <div style='background-color: #1F2937; padding: 20px; border-radius: 12px; margin-bottom: 24px; box-shadow: 0 4px 6px rgba(0,0,0,0.3);'>
+        <h1 style='color: #F9FAFB; margin: 0;'>📊 Sistema Elétrico Brasileiro</h1>
+        <p style='color: #9CA3AF; margin: 10px 0 0 0;'>Dados em Tempo Real do ONS</p>
+    </div>
+""", unsafe_allow_html=True)
 
-# Layout responsivo para telas menores
-col1, col2 = st.columns(1 if st.sidebar.checkbox("Empilhar Gráficos") else 2)
+# Métricas principais
+if fonte_totals:
+    total_geracao = sum(fonte_totals.values())
+    renovaveis = (fonte_totals.get('Hidráulica', 0) + fonte_totals.get('Eólica', 0) + 
+                  fonte_totals.get('Solar', 0))
+    percentual_renovavel = (renovaveis / total_geracao * 100) if total_geracao > 0 else 0
+    
+    col1, col2, col3, col4 = st.columns(4)
+    
+    with col1:
+        st.metric(
+            "Geração Total",
+            f"{total_geracao:,.0f} MW",
+            "Tempo Real"
+        )
+        
+    with col2:
+        st.metric(
+            "Energia Renovável",
+            f"{percentual_renovavel:.1f}%",
+            f"{'+' if percentual_renovavel > 70 else ''}{percentual_renovavel-70:.1f}% vs meta"
+        )
+        
+    with col3:
+        if reservatorios:
+            nivel_medio = sum(r.get('valor', 0) for r in reservatorios) / len(reservatorios)
+            st.metric(
+                "Nível Reservatórios",
+                f"{nivel_medio:.1f}%",
+                f"{'+' if nivel_medio > 50 else ''}{nivel_medio-50:.1f}% vs média"
+            )
+            
+    with col4:
+        max_geracao = max(fonte_totals.values())
+        st.metric(
+            "Pico de Geração",
+            f"{max_geracao:,.0f} MW",
+            "Última hora"
+        )
+
+# Gráficos principais
+col1, col2 = st.columns(2)
 
 with col1:
-    st.plotly_chart(fig_rosca, use_container_width=True)
-    st.plotly_chart(fig_barras, use_container_width=True)
+    st.markdown("### Matriz Elétrica Atual")
+    if fonte_totals:
+        # Gráfico de rosca com dados reais
+        fig_rosca = go.Figure(data=[go.Pie(
+            labels=list(fonte_totals.keys()),
+            values=list(fonte_totals.values()),
+            hole=.75,
+            marker_colors=['#60A5FA', '#34D399', '#FBBF24', '#F87171', '#A78BFA'],
+            textinfo='label+percent',
+            textposition='outside',
+            textfont=dict(size=12, color=TEXT_COLOR)
+        )])
+        
+        fig_rosca.add_annotation(
+            text=f'Total<br>{total_geracao:,.0f}<br>MW',
+            x=0.5, y=0.5,
+            font=dict(size=16, color=TEXT_COLOR, family='Arial Black'),
+            showarrow=False
+        )
+        
+        fig_rosca.update_layout(
+            showlegend=True,
+            legend=dict(
+                orientation="h",
+                yanchor="bottom",
+                y=-0.2,
+                xanchor="center",
+                x=0.5,
+                font=dict(color=TEXT_COLOR)
+            ),
+            margin=dict(t=20, b=20, l=20, r=20),
+            height=400,
+            paper_bgcolor=CARD_COLOR,
+            plot_bgcolor=CARD_COLOR
+        )
+        
+        st.plotly_chart(fig_rosca, use_container_width=True)
 
 with col2:
-    st.plotly_chart(fig_sin, use_container_width=True)
+    st.markdown("### Geração por Fonte (24h)")
+    if timeline_data:
+        fig_linha = go.Figure()
+        
+        cores = {
+            'Hidráulica': '#60A5FA',
+            'Eólica': '#34D399',
+            'Solar': '#FBBF24',
+            'Térmica': '#F87171',
+            'Nuclear': '#A78BFA'
+        }
+        
+        for fonte, df in timeline_data.items():
+            fig_linha.add_trace(go.Scatter(
+                x=df['instante'],
+                y=df['geracao'],
+                name=fonte,
+                line=dict(color=cores.get(fonte, '#FFFFFF'), width=2),
+                fill='tonexty' if fonte == list(timeline_data.keys())[0] else 'none'
+            ))
+        
+        fig_linha.update_layout(
+            xaxis_title="Hora",
+            yaxis_title="Geração (MW)",
+            margin=dict(t=20, b=20, l=20, r=20),
+            height=400,
+            paper_bgcolor=CARD_COLOR,
+            plot_bgcolor=CARD_COLOR,
+            font=dict(color=TEXT_COLOR),
+            xaxis=dict(showgrid=True, gridcolor=GRID_COLOR),
+            yaxis=dict(showgrid=True, gridcolor=GRID_COLOR),
+            legend=dict(
+                orientation="h",
+                yanchor="bottom",
+                y=-0.2,
+                xanchor="center",
+                x=0.5,
+                font=dict(color=TEXT_COLOR)
+            )
+        )
+        
+        st.plotly_chart(fig_linha, use_container_width=True)
 
-# Atualização automática com intervalo personalizável
-time.sleep(refresh_interval)
-st.experimental_rerun()
+# Gráficos de fontes renováveis
+st.markdown("### Geração Renovável por Região")
+col1, col2 = st.columns(2)
+
+with col1:
+    st.markdown("#### Eólica")
+    eolica_data = {k: v for k, v in dataframes.items() if 'Eólica' in k}
+    if eolica_data:
+        fig_eolica = go.Figure()
+        
+        for regiao, df in eolica_data.items():
+            regiao_nome = regiao.split(' - ')[1]
+            fig_eolica.add_trace(go.Scatter(
+                x=df['instante'],
+                y=df['geracao'],
+                name=regiao_nome,
+                line=dict(width=2)
+            ))
+        
+        fig_eolica.update_layout(
+            margin=dict(t=20, b=20, l=20, r=20),
+            height=300,
+            paper_bgcolor=CARD_COLOR,
+            plot_bgcolor=CARD_COLOR,
+            font=dict(color=TEXT_COLOR),
+            xaxis=dict(showgrid=True, gridcolor=GRID_COLOR),
+            yaxis=dict(showgrid=True, gridcolor=GRID_COLOR, title="MW")
+        )
+        
+        st.plotly_chart(fig_eolica, use_container_width=True)
+
+with col2:
+    st.markdown("#### Solar")
+    solar_data = {k: v for k, v in dataframes.items() if 'Solar' in k}
+    if solar_data:
+        fig_solar = go.Figure()
+        
+        for regiao, df in solar_data.items():
+            regiao_nome = regiao.split(' - ')[1]
+            fig_solar.add_trace(go.Scatter(
+                x=df['instante'],
+                y=df['geracao'],
+                name=regiao_nome,
+                line=dict(width=2)
+            ))
+        
+        fig_solar.update_layout(
+            margin=dict(t=20, b=20, l=20, r=20),
+            height=300,
+            paper_bgcolor=CARD_COLOR,
+            plot_bgcolor=CARD_COLOR,
+            font=dict(color=TEXT_COLOR),
+            xaxis=dict(showgrid=True, gridcolor=GRID_COLOR),
+            yaxis=dict(showgrid=True, gridcolor=GRID_COLOR, title="MW")
+        )
+        
+        st.plotly_chart(fig_solar, use_container_width=True)
+
+# Status dos Reservatórios
+if reservatorios:
+    st.markdown("### Status dos Reservatórios")
+    cols = st.columns(len(reservatorios))
+    for col, reservatorio in zip(cols, reservatorios):
+        with col:
+            st.markdown(f"""
+                <div class="status-card">
+                    <h4 style='color: #F9FAFB; margin: 0;'>{reservatorio.get('subsistema', '')}</h4>
+                    <h2 style='color: #F9FAFB; margin: 10px 0;'>{reservatorio.get('valor', 0):.1f}%</h2>
+                    <p style='color: #9CA3AF; margin: 0;'>Capacidade</p>
+                </div>
+            """, unsafe_allow_html=True)
+
+# Informações de atualização
+st.markdown(f"""
+    <div style='background-color: {CARD_COLOR}; padding: 20px; border-radius: 12px; margin-top: 24px; box-shadow: 0 4px 6px rgba(0,0,0,0.3);'>
+        <h4 style='color: {TEXT_COLOR}; margin-bottom: 12px;'>ℹ️ Informações do Sistema</h4>
+        <p style='color: #9CA3AF; margin: 0;'>• Dados atualizados a cada 20 segundos</p>
+        <p style='color: #9CA3AF; margin: 4px 0;'>• Fonte: ONS (Operador Nacional do Sistema Elétrico)</p>
+        <p style='color: #9CA3AF; margin: 4px 0;'>• Última atualização: {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}</p>
+    </div>
+""", unsafe_allow_html=True)
