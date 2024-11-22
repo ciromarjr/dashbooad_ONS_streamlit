@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 import requests
 from datetime import datetime, timedelta
 import numpy as np
@@ -12,45 +13,24 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# Cores e estilos
-BACKGROUND_COLOR = "#111827"
-CARD_COLOR = "#1F2937"
-TEXT_COLOR = "#F9FAFB"
-GRID_COLOR = "#374151"
+# Cores e estilos modernos
+BACKGROUND_COLOR = "#0f172a"  # Slate 900
+CARD_COLOR = "#1e293b"        # Slate 800
+TEXT_COLOR = "#f8fafc"        # Slate 50
+GRID_COLOR = "#334155"        # Slate 700
+ACCENT_COLOR = "#3b82f6"      # Blue 500
 
-# API Configuration para obter previsão de geração
-AUTH_URL = "https://integra.ons.org.br/api/autenticar"
-PREV_GERACAO_URL = "https://integra.ons.org.br/api/programacao/repdoe/CargaMedioDiario?Ano=2024&Mes=11&Dia=15"
-AUTH_PAYLOAD = {
-    "usuario": "",
-    "senha": ""
+# Cores para fontes de energia
+ENERGY_COLORS = {
+    'Hidráulica': '#60A5FA',    # Blue 400
+    'Eólica': '#34D399',        # Emerald 400
+    'Solar': '#FBBF24',         # Amber 400
+    'Térmica': '#F87171',       # Red 400
+    'Nuclear': '#A78BFA',       # Purple 400
+    'Carga': '#EC4899'          # Pink 400
 }
-def chunk_list(lst, n):
-    return [lst[i:i + n] for i in range(0, len(lst), n)]
-def get_usina_generation_forecast(token, date, usinas):
-    headers = {
-        "Content-Type": "application/json",
-        "Authorization": f"Bearer {token}"
-    }
-    all_data = []
-    
-    payload = {
-            "Ano": date.year,
-            "Mes": date.month,
-            "Dia": date.day,
-            
-        }
-    response = requests.post(PREV_GERACAO_URL, json=payload, headers=headers)
-    if response.status_code == 200:
-            all_data.extend(response.json().get("Usinas", []))
-    else:
-            print(f"Error in request: {response.status_code}")
-            return None
-            
-    return all_data
 
-
-# Funções de obtenção de dados Carga
+# Funções de obtenção de dados
 @st.cache_data(ttl=20)
 def get_data(url):
     try:
@@ -63,40 +43,24 @@ def get_data(url):
                     if not df.empty:
                         df['instante'] = pd.to_datetime(df['instante'], errors='coerce')
                         df = df.dropna(subset=['instante'])
-                        df['carga'] = df['carga'] # / 60  Convertendo de MWh para MW
-                        return df
-    except Exception as e:
-        st.error(f"Erro ao carregar dados: {e}")
-    return None
-
-# Funções de obtenção de dados Geração
-@st.cache_data(ttl=20)
-def get_data(url):
-    try:
-        response = requests.get(url)
-        if response.status_code == 200:
-            if response.content and response.content.strip():
-                data = response.json()
-                if isinstance(data, list) and data:
-                    df = pd.DataFrame(data)
-                    if not df.empty:
-                        df['instante'] = pd.to_datetime(df['instante'], errors='coerce')
-                        df = df.dropna(subset=['instante'])
-                        df['geracao'] = df['geracao'] # / 60  Convertendo de MWh para MW
+                        df['geracao'] = df['geracao']
                         return df
     except Exception as e:
         st.error(f"Erro ao carregar dados: {e}")
     return None
 
 @st.cache_data(ttl=20)
-def get_carga_subsistema():
+def get_carga_data():
     url = "https://integra.ons.org.br/api/energiaagora/Get/Carga_SIN_json"
     try:
         response = requests.get(url)
         if response.status_code == 200:
-            return response.json()
+            data = response.json()
+            df = pd.DataFrame(data)
+            df['instante'] = pd.to_datetime(df['instante'])
+            return df
     except Exception as e:
-        st.error(f"Erro ao carregar Carga subsistema: {e}")
+        st.error(f"Erro ao carregar dados de carga: {e}")
     return None
 
 @st.cache_data(ttl=20)
@@ -168,7 +132,7 @@ def load_data():
 # Função para processar dados
 def process_data(dataframes):
     if not dataframes:
-        return None, None, None, None
+        return None, None
     
     # Agregando dados por fonte
     fonte_totals = {}
@@ -191,116 +155,171 @@ def process_data(dataframes):
     
     return fonte_totals, timeline_data
 
-# Carregando dados
-dataframes, balanco, reservatorios = load_data()
-fonte_totals, timeline_data = process_data(dataframes)
-# Estilo personalizado para o tema dark
+# Estilo personalizado moderno
 st.markdown("""
     <style>
     .main {
-        background-color: #111827;
+        background-color: #0f172a;
     }
     .stApp {
-        background-color: #111827;
+        background-color: #0f172a;
     }
-    .stMetric {
-        background-color: #1F2937;
+    .metric-container {
+        background-color: #1e293b;
+        border-radius: 12px;
         padding: 20px;
-        border-radius: 12px;
         box-shadow: 0 4px 6px rgba(0,0,0,0.3);
-        color: #F9FAFB !important;
+        transition: transform 0.3s ease;
     }
-    .css-1r6slb0 {
-        background-color: #1F2937;
-        border-radius: 12px;
-        padding: 24px;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.3);
-    }
-    h1, h2, h3, h4, h5, h6, .metric-label {
-        color: #F9FAFB !important;
+    .metric-container:hover {
+        transform: translateY(-2px);
     }
     .metric-value {
-        color: #F9FAFB !important;
+        font-size: 28px;
+        font-weight: bold;
+        color: #f8fafc;
     }
-    div[data-testid="stMetricValue"] {
-        color: #F9FAFB !important;
+    .metric-label {
+        font-size: 14px;
+        color: #94a3b8;
     }
-    div[data-testid="stMetricLabel"] > label {
-        color: #9CA3AF !important;
-    }
-    .stMetric:hover {
-        transform: translateY(-2px);
-        transition: all 0.3s ease;
-    }
-    .plot-container {
-        background-color: #1F2937;
+    .chart-container {
+        background-color: #1e293b;
         border-radius: 12px;
         padding: 20px;
         margin: 10px 0;
         box-shadow: 0 4px 6px rgba(0,0,0,0.3);
     }
-    .status-card {
-        background-color: #1F2937;
-        padding: 15px;
-        border-radius: 10px;
-        margin: 5px 0;
-    }
-    .status-card:hover {
-        transform: translateY(-2px);
-        transition: all 0.3s ease;
+    .section-header {
+        color: #f8fafc;
+        font-size: 24px;
+        font-weight: bold;
+        margin: 20px 0;
+        padding-bottom: 10px;
+        border-bottom: 2px solid #3b82f6;
     }
     </style>
 """, unsafe_allow_html=True)
 
-# Header do Dashboard
+# Header moderno
 st.markdown("""
-    <div style='background-color: #1F2937; padding: 20px; border-radius: 12px; margin-bottom: 24px; box-shadow: 0 4px 6px rgba(0,0,0,0.3);'>
-        <h1 style='color: #F9FAFB; margin: 0;'>📊 Sistema Elétrico Brasileiro</h1>
-        <p style='color: #9CA3AF; margin: 10px 0 0 0;'>Dados em Tempo Real do ONS</p>
+    <div style='background: linear-gradient(90deg, #1e293b, #0f172a); padding: 30px; border-radius: 12px; margin-bottom: 24px; box-shadow: 0 4px 6px rgba(0,0,0,0.3);'>
+        <h1 style='color: #f8fafc; margin: 0; display: flex; align-items: center;'>
+            <span style='font-size: 32px; margin-right: 10px;'>⚡</span>
+            Sistema Elétrico Brasileiro
+        </h1>
+        <p style='color: #94a3b8; margin: 10px 0 0 0;'>Monitoramento em Tempo Real</p>
     </div>
 """, unsafe_allow_html=True)
 
-# Métricas principais
-if fonte_totals:
+# Carregando dados
+dataframes, balanco, reservatorios = load_data()
+carga_data = get_carga_data()
+fonte_totals, timeline_data = process_data(dataframes)
+
+# Métricas principais em cards modernos
+if fonte_totals and carga_data is not None:
     total_geracao = sum(fonte_totals.values())
+    total_carga = carga_data['carga'].iloc[-1] if not carga_data.empty else 0
     renovaveis = (fonte_totals.get('Hidráulica', 0) + fonte_totals.get('Eólica', 0) + 
                   fonte_totals.get('Solar', 0))
     percentual_renovavel = (renovaveis / total_geracao * 100) if total_geracao > 0 else 0
     
-    col1, col2, col3, col4 = st.columns(4)
+    col1, col2, col3, col4, col5 = st.columns(5)
     
     with col1:
-        st.metric(
-            "Geração Total",
-            f"{total_geracao:,.0f} MW",
-            "Tempo Real"
-        )
-        
+        st.markdown("""
+            <div class='metric-container'>
+                <div class='metric-value'>💡 {:,.0f} MW</div>
+                <div class='metric-label'>Geração Total</div>
+            </div>
+        """.format(total_geracao), unsafe_allow_html=True)
+    
     with col2:
-        st.metric(
-            "Energia Renovável",
-            f"{percentual_renovavel:.1f}%",
-            f"{'+' if percentual_renovavel > 70 else ''}{percentual_renovavel-70:.1f}% vs meta"
-        )
-        
+        st.markdown("""
+            <div class='metric-container'>
+                <div class='metric-value'>⚡ {:,.0f} MW</div>
+                <div class='metric-label'>Carga Total</div>
+            </div>
+        """.format(total_carga), unsafe_allow_html=True)
+    
     with col3:
+        st.markdown("""
+            <div class='metric-container'>
+                <div class='metric-value'>🌱 {:.1f}%</div>
+                <div class='metric-label'>Energia Renovável</div>
+            </div>
+        """.format(percentual_renovavel), unsafe_allow_html=True)
+    
+    with col4:
         if reservatorios:
             nivel_medio = sum(r.get('valor', 0) for r in reservatorios) / len(reservatorios)
-            st.metric(
-                "Nível Reservatórios",
-                f"{nivel_medio:.1f}%",
-                f"{'+' if nivel_medio > 50 else ''}{nivel_medio-50:.1f}% vs média"
-            )
-            
-    with col4:
-        max_geracao = max(fonte_totals.values())
-        st.metric(
-            "Pico de Geração",
-            f"{max_geracao:,.0f} MW",
-            "Última hora"
-        )
+            st.markdown("""
+                <div class='metric-container'>
+                    <div class='metric-value'>💧 {:.1f}%</div>
+                    <div class='metric-label'>Nível Reservatórios</div>
+                </div>
+            """.format(nivel_medio), unsafe_allow_html=True)
+    
+    with col5:
+        margem = ((total_geracao - total_carga) / total_geracao * 100) if total_geracao > 0 else 0
+        st.markdown("""
+            <div class='metric-container'>
+                <div class='metric-value'>📊 {:.1f}%</div>
+                <div class='metric-label'>Margem de Capacidade</div>
+            </div>
+        """.format(margem), unsafe_allow_html=True)
 
-# Gráficos principais
+# Gráfico de Geração vs Carga
+st.markdown("<h3 class='section-header'>Geração vs Carga (24h)</h3>", unsafe_allow_html=True)
+if timeline_data and carga_data is not None:
+    fig = go.Figure()
+    
+    # Adicionando linha de carga
+    fig.add_trace(go.Scatter(
+        x=carga_data['instante'],
+        y=carga_data['carga'],
+        name='Carga Total',
+        line=dict(color=ENERGY_COLORS['Carga'], width=3, dash='dot'),
+    ))
+    
+    # Adicionando área empilhada de geração por fonte
+    for fonte, df in timeline_data.items():
+        fig.add_trace(go.Scatter(
+            x=df['instante'],
+            y=df['geracao'],
+            name=fonte,
+            stackgroup='geracao',
+            line=dict(width=0),
+            fillcolor=ENERGY_COLORS.get(fonte, '#FFFFFF')
+        ))
+    
+    fig.update_layout(
+        template='plotly_dark',
+        paper_bgcolor=CARD_COLOR,
+        plot_bgcolor=CARD_COLOR,
+        margin=dict(t=20, b=20, l=20, r=20),
+        height=400,
+        hovermode='x unified',
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=-0.2,
+            xanchor="center",
+            x=0.5
+        ),
+        xaxis=dict(
+            showgrid=True,
+            gridcolor=GRID_COLOR,
+            title="Hora"
+        ),
+        yaxis=dict(
+            showgrid=True,
+            gridcolor=GRID_COLOR,
+            title="MW"
+        )
+    )
+    # Gráficos principais
 col1, col2 = st.columns(2)
 
 with col1:
