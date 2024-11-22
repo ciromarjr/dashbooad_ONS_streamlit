@@ -198,6 +198,17 @@ st.markdown("""
         padding-bottom: 10px;
         border-bottom: 2px solid #3b82f6;
     }
+    .reservoir-card {
+        background-color: #1e293b;
+        border-radius: 12px;
+        padding: 15px;
+        margin: 5px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        transition: transform 0.3s ease;
+    }
+    .reservoir-card:hover {
+        transform: translateY(-2px);
+    }
     </style>
 """, unsafe_allow_html=True)
 
@@ -270,70 +281,20 @@ if fonte_totals and carga_data is not None:
             </div>
         """.format(margem), unsafe_allow_html=True)
 
-# Gráfico de Geração vs Carga
-st.markdown("<h3 class='section-header'>Geração vs Carga (24h)</h3>", unsafe_allow_html=True)
-if timeline_data and carga_data is not None:
-    fig = go.Figure()
-    
-    # Adicionando linha de carga
-    fig.add_trace(go.Scatter(
-        x=carga_data['instante'],
-        y=carga_data['carga'],
-        name='Carga Total',
-        line=dict(color=ENERGY_COLORS['Carga'], width=3, dash='dot'),
-    ))
-    
-    # Adicionando área empilhada de geração por fonte
-    for fonte, df in timeline_data.items():
-        fig.add_trace(go.Scatter(
-            x=df['instante'],
-            y=df['geracao'],
-            name=fonte,
-            stackgroup='geracao',
-            line=dict(width=0),
-            fillcolor=ENERGY_COLORS.get(fonte, '#FFFFFF')
-        ))
-    
-    fig.update_layout(
-        template='plotly_dark',
-        paper_bgcolor=CARD_COLOR,
-        plot_bgcolor=CARD_COLOR,
-        margin=dict(t=20, b=20, l=20, r=20),
-        height=400,
-        hovermode='x unified',
-        legend=dict(
-            orientation="h",
-            yanchor="bottom",
-            y=-0.2,
-            xanchor="center",
-            x=0.5
-        ),
-        xaxis=dict(
-            showgrid=True,
-            gridcolor=GRID_COLOR,
-            title="Hora"
-        ),
-        yaxis=dict(
-            showgrid=True,
-            gridcolor=GRID_COLOR,
-            title="MW"
-        )
-    )
-    # Gráficos principais
+# Gráficos principais
 col1, col2 = st.columns(2)
 
 with col1:
-    st.markdown("### Matriz Elétrica Atual")
+    st.markdown("<h3 class='section-header'>Matriz Elétrica Atual</h3>", unsafe_allow_html=True)
     if fonte_totals:
-        # Gráfico de rosca com dados reais
         fig_rosca = go.Figure(data=[go.Pie(
             labels=list(fonte_totals.keys()),
             values=list(fonte_totals.values()),
             hole=.75,
-            marker_colors=['#60A5FA', '#34D399', '#FBBF24', '#F87171', '#A78BFA'],
+            marker_colors=[ENERGY_COLORS[fonte] for fonte in fonte_totals.keys()],
             textinfo='label+percent',
             textposition='outside',
-            textfont=dict(size=12, color=TEXT_COLOR)
+            textfont=dict(color=TEXT_COLOR)
         )])
         
         fig_rosca.add_annotation(
@@ -345,54 +306,10 @@ with col1:
         
         fig_rosca.update_layout(
             showlegend=True,
-            legend=dict(
-                orientation="h",
-                yanchor="bottom",
-                y=-0.2,
-                xanchor="center",
-                x=0.5,
-                font=dict(color=TEXT_COLOR)
-            ),
-            margin=dict(t=20, b=20, l=20, r=20),
-            height=400,
-            paper_bgcolor=CARD_COLOR,
-            plot_bgcolor=CARD_COLOR
-        )
-        
-        st.plotly_chart(fig_rosca, use_container_width=True)
-
-with col2:
-    st.markdown("### Geração por Fonte (24h)")
-    if timeline_data:
-        fig_linha = go.Figure()
-        
-        cores = {
-            'Hidráulica': '#60A5FA',
-            'Eólica': '#34D399',
-            'Solar': '#FBBF24',
-            'Térmica': '#F87171',
-            'Nuclear': '#A78BFA'
-        }
-        
-        for fonte, df in timeline_data.items():
-            fig_linha.add_trace(go.Scatter(
-                x=df['instante'],
-                y=df['geracao'],
-                name=fonte,
-                line=dict(color=cores.get(fonte, '#FFFFFF'), width=2),
-                fill='tonexty' if fonte == list(timeline_data.keys())[0] else 'none'
-            ))
-        
-        fig_linha.update_layout(
-            xaxis_title="Hora",
-            yaxis_title="Geração (MW)",
-            margin=dict(t=20, b=20, l=20, r=20),
-            height=400,
             paper_bgcolor=CARD_COLOR,
             plot_bgcolor=CARD_COLOR,
-            font=dict(color=TEXT_COLOR),
-            xaxis=dict(showgrid=True, gridcolor=GRID_COLOR),
-            yaxis=dict(showgrid=True, gridcolor=GRID_COLOR),
+            margin=dict(t=0, b=0, l=0, r=0),
+            height=400,
             legend=dict(
                 orientation="h",
                 yanchor="bottom",
@@ -403,14 +320,65 @@ with col2:
             )
         )
         
-        st.plotly_chart(fig_linha, use_container_width=True)
+        st.plotly_chart(fig_rosca, use_container_width=True)
+with col2:
+    st.markdown("<h3 class='section-header'>Geração vs Carga (24h)</h3>", unsafe_allow_html=True)
+    if timeline_data and carga_data is not None:
+        fig = go.Figure()
+        
+        # Adicionando linha de carga
+        fig.add_trace(go.Scatter(
+            x=carga_data['instante'],
+            y=carga_data['carga'],
+            name='Carga Total',
+            line=dict(color=ENERGY_COLORS['Carga'], width=3, dash='dot'),
+        ))
+        
+        # Adicionando área empilhada de geração por fonte
+        for fonte, df in timeline_data.items():
+            fig.add_trace(go.Scatter(
+                x=df['instante'],
+                y=df['geracao'],
+                name=fonte,
+                stackgroup='geracao',
+                line=dict(width=0),
+                fillcolor=ENERGY_COLORS.get(fonte, '#FFFFFF')
+            ))
+        
+        fig.update_layout(
+            template='plotly_dark',
+            paper_bgcolor=CARD_COLOR,
+            plot_bgcolor=CARD_COLOR,
+            margin=dict(t=20, b=20, l=20, r=20),
+            height=400,
+            hovermode='x unified',
+            legend=dict(
+                orientation="h",
+                yanchor="bottom",
+                y=-0.2,
+                xanchor="center",
+                x=0.5
+            ),
+            xaxis=dict(
+                showgrid=True,
+                gridcolor=GRID_COLOR,
+                title="Hora"
+            ),
+            yaxis=dict(
+                showgrid=True,
+                gridcolor=GRID_COLOR,
+                title="MW"
+            )
+        )
+        
+        st.plotly_chart(fig, use_container_width=True)
 
-# Gráficos de fontes renováveis
-st.markdown("### Geração Renovável por Região")
+# Seção de Fontes Renováveis
+st.markdown("<h3 class='section-header'>Geração Renovável por Região</h3>", unsafe_allow_html=True)
 col1, col2 = st.columns(2)
 
 with col1:
-    st.markdown("#### Eólica")
+    st.markdown("<h4 style='color: #f8fafc;'>Geração Eólica</h4>", unsafe_allow_html=True)
     eolica_data = {k: v for k, v in dataframes.items() if 'Eólica' in k}
     if eolica_data:
         fig_eolica = go.Figure()
@@ -425,19 +393,35 @@ with col1:
             ))
         
         fig_eolica.update_layout(
-            margin=dict(t=20, b=20, l=20, r=20),
-            height=300,
+            template='plotly_dark',
             paper_bgcolor=CARD_COLOR,
             plot_bgcolor=CARD_COLOR,
-            font=dict(color=TEXT_COLOR),
-            xaxis=dict(showgrid=True, gridcolor=GRID_COLOR),
-            yaxis=dict(showgrid=True, gridcolor=GRID_COLOR, title="MW")
+            margin=dict(t=20, b=20, l=20, r=20),
+            height=300,
+            hovermode='x unified',
+            legend=dict(
+                orientation="h",
+                yanchor="bottom",
+                y=-0.2,
+                xanchor="center",
+                x=0.5
+            ),
+            xaxis=dict(
+                showgrid=True,
+                gridcolor=GRID_COLOR,
+                title="Hora"
+            ),
+            yaxis=dict(
+                showgrid=True,
+                gridcolor=GRID_COLOR,
+                title="MW"
+            )
         )
         
         st.plotly_chart(fig_eolica, use_container_width=True)
 
 with col2:
-    st.markdown("#### Solar")
+    st.markdown("<h4 style='color: #f8fafc;'>Geração Solar</h4>", unsafe_allow_html=True)
     solar_data = {k: v for k, v in dataframes.items() if 'Solar' in k}
     if solar_data:
         fig_solar = go.Figure()
@@ -452,37 +436,66 @@ with col2:
             ))
         
         fig_solar.update_layout(
-            margin=dict(t=20, b=20, l=20, r=20),
-            height=300,
+            template='plotly_dark',
             paper_bgcolor=CARD_COLOR,
             plot_bgcolor=CARD_COLOR,
-            font=dict(color=TEXT_COLOR),
-            xaxis=dict(showgrid=True, gridcolor=GRID_COLOR),
-            yaxis=dict(showgrid=True, gridcolor=GRID_COLOR, title="MW")
+            margin=dict(t=20, b=20, l=20, r=20),
+            height=300,
+            hovermode='x unified',
+            legend=dict(
+                orientation="h",
+                yanchor="bottom",
+                y=-0.2,
+                xanchor="center",
+                x=0.5
+            ),
+            xaxis=dict(
+                showgrid=True,
+                gridcolor=GRID_COLOR,
+                title="Hora"
+            ),
+            yaxis=dict(
+                showgrid=True,
+                gridcolor=GRID_COLOR,
+                title="MW"
+            )
         )
         
         st.plotly_chart(fig_solar, use_container_width=True)
 
 # Status dos Reservatórios
+st.markdown("<h3 class='section-header'>Status dos Reservatórios</h3>", unsafe_allow_html=True)
 if reservatorios:
-    st.markdown("### Status dos Reservatórios")
     cols = st.columns(len(reservatorios))
     for col, reservatorio in zip(cols, reservatorios):
         with col:
+            nivel = reservatorio.get('valor', 0)
+            cor = '#34D399' if nivel > 70 else '#FBBF24' if nivel > 40 else '#F87171'
             st.markdown(f"""
-                <div class="status-card">
-                    <h4 style='color: #F9FAFB; margin: 0;'>{reservatorio.get('subsistema', '')}</h4>
-                    <h2 style='color: #F9FAFB; margin: 10px 0;'>{reservatorio.get('valor', 0):.1f}%</h2>
-                    <p style='color: #9CA3AF; margin: 0;'>Capacidade</p>
+                <div class='reservoir-card'>
+                    <h4 style='color: #f8fafc; margin: 0;'>{reservatorio.get('subsistema', '')}</h4>
+                    <div style='font-size: 28px; font-weight: bold; color: {cor}; margin: 10px 0;'>{nivel:.1f}%</div>
+                    <div style='color: #94a3b8; font-size: 12px;'>Capacidade Atual</div>
                 </div>
             """, unsafe_allow_html=True)
 
-# Informações de atualização
-st.markdown(f"""
-    <div style='background-color: {CARD_COLOR}; padding: 20px; border-radius: 12px; margin-top: 24px; box-shadow: 0 4px 6px rgba(0,0,0,0.3);'>
-        <h4 style='color: {TEXT_COLOR}; margin-bottom: 12px;'>ℹ️ Informações do Sistema</h4>
-        <p style='color: #9CA3AF; margin: 0;'>• Dados atualizados a cada 20 segundos</p>
-        <p style='color: #9CA3AF; margin: 4px 0;'>• Fonte: ONS (Operador Nacional do Sistema Elétrico)</p>
-        <p style='color: #9CA3AF; margin: 4px 0;'>• Última atualização: {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}</p>
+# Informações do Sistema e Rodapé
+st.markdown("""
+    <div style='background: linear-gradient(90deg, #1e293b, #0f172a); padding: 20px; border-radius: 12px; margin-top: 24px; box-shadow: 0 4px 6px rgba(0,0,0,0.3);'>
+        <h4 style='color: #f8fafc; margin-bottom: 12px;'>ℹ️ Informações do Sistema</h4>
+        <div style='display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px;'>
+            <div>
+                <p style='color: #94a3b8; margin: 4px 0;'>• Dados atualizados a cada 20 segundos</p>
+                <p style='color: #94a3b8; margin: 4px 0;'>• Fonte: ONS (Operador Nacional do Sistema Elétrico)</p>
+            </div>
+            <div>
+                <p style='color: #94a3b8; margin: 4px 0;'>• Monitoramento em tempo real do SIN</p>
+                <p style='color: #94a3b8; margin: 4px 0;'>• Última atualização: {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}</p>
+            </div>
+            <div>
+                <p style='color: #94a3b8; margin: 4px 0;'>• Dados históricos das últimas 24 horas</p>
+                <p style='color: #94a3b8; margin: 4px 0;'>• Atualização automática ativa</p>
+            </div>
+        </div>
     </div>
 """, unsafe_allow_html=True)
