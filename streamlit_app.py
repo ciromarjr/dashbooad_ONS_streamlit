@@ -310,25 +310,7 @@ if fonte_totals and carga_data is not None:
             </div>
         """.format(percentual_renovavel), unsafe_allow_html=True)
     
-    with col4:
-        if reservatorios:
-            dados_reservatorios = process_reservatorio_data(reservatorios)
-            nivel_medio = sum(s['valor_util_medio'] for s in dados_reservatorios.values()) / len(dados_reservatorios)
-            st.markdown("""
-                <div class='metric-container'>
-                    <div class='metric-value'>💧 {:.1f}%</div>
-                    <div class='metric-label'>Nível Reservatórios</div>
-                </div>
-            """.format(nivel_medio), unsafe_allow_html=True)
     
-    with col5:
-        margem = ((total_geracao - total_carga) / total_geracao * 100) if total_geracao > 0 else 0
-        st.markdown("""
-            <div class='metric-container'>
-                <div class='metric-value'>📊 {:.1f}%</div>
-                <div class='metric-label'>Margem de Capacidade</div>
-            </div>
-        """.format(margem), unsafe_allow_html=True)
     with col4:
         if reservatorios:
             dados_reservatorios = process_reservatorio_data(reservatorios)
