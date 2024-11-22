@@ -85,6 +85,55 @@ def get_situacao_reservatorios():
         st.error(f"Erro ao carregar situação dos reservatórios: {e}")
     return None
 
+@st.cache_data(ttl=20)
+def process_reservatorio_data(data):
+    if not data:
+        return None
+        
+    # Agrupar por subsistema
+    subsistemas = {}
+    for reservatorio in data:
+        subsistema = reservatorio.get('Subsistema')
+        if subsistema not in subsistemas:
+            subsistemas[subsistema] = {
+                'valor_util_total': 0,
+                'reservatorios': [],
+                'quantidade': 0,
+                'ear_verificada': 0,
+                'ear_maxima': 0
+            }
+        
+        # Adicionar informações do reservatório
+        subsistemas[subsistema]['reservatorios'].append({
+            'nome': reservatorio.get('Reservatorio'),
+            'valor_util': reservatorio.get('ReservatorioValorUtil', 0),
+            'porcentagem': reservatorio.get('ReservatorioPorcentagem', 0),
+            'ear_verificada': reservatorio.get('ReservatorioEARVerificadaMWMes', 0),
+            'ear_maxima': reservatorio.get('ReservatorioMax', 0),
+            'bacia': reservatorio.get('Bacia')
+        })
+        
+        # Atualizar totais do subsistema
+        subsistemas[subsistema]['quantidade'] += 1
+        subsistemas[subsistema]['ear_verificada'] += reservatorio.get('ReservatorioEARVerificadaMWMes', 0)
+        subsistemas[subsistema]['ear_maxima'] += reservatorio.get('ReservatorioMax', 0)
+        subsistemas[subsistema]['valor_util_total'] += reservatorio.get('ReservatorioValorUtil', 0)
+    
+    # Calcular médias para cada subsistema
+    for subsistema in subsistemas:
+        if subsistemas[subsistema]['quantidade'] > 0:
+            subsistemas[subsistema]['valor_util_medio'] = (
+                subsistemas[subsistema]['valor_util_total'] / 
+                subsistemas[subsistema]['quantidade']
+            )
+            subsistemas[subsistema]['ear_porcentagem'] = (
+                (subsistemas[subsistema]['ear_verificada'] / 
+                subsistemas[subsistema]['ear_maxima']) * 100 
+                if subsistemas[subsistema]['ear_maxima'] > 0 else 0
+            )
+    
+    return subsistemas
+
 def load_data():
     urls = {
         'Eólica': {
@@ -129,7 +178,6 @@ def load_data():
     
     return dataframes, balanco, reservatorios
 
-# Função para processar dados
 def process_data(dataframes):
     if not dataframes:
         return None, None
@@ -154,7 +202,6 @@ def process_data(dataframes):
                 timeline_data[fonte]['geracao'] += df['geracao']
     
     return fonte_totals, timeline_data
-
 # Estilo personalizado moderno
 st.markdown("""
     <style>
@@ -258,13 +305,34 @@ if fonte_totals and carga_data is not None:
         st.markdown("""
             <div class='metric-container'>
                 <div class='metric-value'>🌱 {:.1f}%</div>
-                <div class='metric-label'>Energia Renovável</div>
+                <div class='metric-label'>
+            <div class='metric-label'>Energia Renovável</div>
             </div>
         """.format(percentual_renovavel), unsafe_allow_html=True)
     
     with col4:
         if reservatorios:
-            nivel_medio = sum(r.get('valor', 0) for r in reservatorios) / len(reservatorios)
+            dados_reservatorios = process_reservatorio_data(reservatorios)
+            nivel_medio = sum(s['valor_util_medio'] for s in dados_reservatorios.values()) / len(dados_reservatorios)
+            st.markdown("""
+                <div class='metric-container'>
+                    <div class='metric-value'>💧 {:.1f}%</div>
+                    <div class='metric-label'>Nível Reservatórios</div>
+                </div>
+            """.format(nivel_medio), unsafe_allow_html=True)
+    
+    with col5:
+        margem = ((total_geracao - total_carga) / total_geracao * 100) if total_geracao > 0 else 0
+        st.markdown("""
+            <div class='metric-container'>
+                <div class='metric-value'>📊 {:.1f}%</div>
+                <div class='metric-label'>Margem de Capacidade</div>
+            </div>
+        """.format(margem), unsafe_allow_html=True)
+    with col4:
+        if reservatorios:
+            dados_reservatorios = process_reservatorio_data(reservatorios)
+            nivel_medio = sum(s['valor_util_medio'] for s in dados_reservatorios.values()) / len(dados_reservatorios)
             st.markdown("""
                 <div class='metric-container'>
                     <div class='metric-value'>💧 {:.1f}%</div>
@@ -321,6 +389,7 @@ with col1:
         )
         
         st.plotly_chart(fig_rosca, use_container_width=True)
+
 with col2:
     st.markdown("<h3 class='section-header'>Geração vs Carga (24h)</h3>", unsafe_allow_html=True)
     if timeline_data and carga_data is not None:
@@ -464,22 +533,46 @@ with col2:
         st.plotly_chart(fig_solar, use_container_width=True)
 
 # Status dos Reservatórios
-st.markdown("<h3 class='section-header'>Status dos Reservatórios</h3>", unsafe_allow_html=True)
 if reservatorios:
-    cols = st.columns(len(reservatorios))
-    for col, reservatorio in zip(cols, reservatorios):
+    dados_reservatorios = process_reservatorio_data(reservatorios)
+    st.markdown("<h3 class='section-header'>Status dos Reservatórios por Subsistema</h3>", unsafe_allow_html=True)
+    
+    cols = st.columns(len(dados_reservatorios))
+    for col, (subsistema, dados) in zip(cols, dados_reservatorios.items()):
         with col:
-            nivel = reservatorio.get('valor', 0)
-            cor = '#34D399' if nivel > 70 else '#FBBF24' if nivel > 40 else '#F87171'
+            valor_util = dados['valor_util_medio']
+            ear_porcentagem = dados['ear_porcentagem']
+            
+            # Definir cor baseado no nível
+            if valor_util >= 70:
+                cor = '#34D399'  # Verde
+            elif valor_util >= 40:
+                cor = '#FBBF24'  # Amarelo
+            else:
+                cor = '#F87171'  # Vermelho
+                
             st.markdown(f"""
                 <div class='reservoir-card'>
-                    <h4 style='color: #f8fafc; margin: 0;'>{reservatorio.get('subsistema', '')}</h4>
-                    <div style='font-size: 28px; font-weight: bold; color: {cor}; margin: 10px 0;'>{nivel:.1f}%</div>
-                    <div style='color: #94a3b8; font-size: 12px;'>Capacidade Atual</div>
+                    <h4 style='color: #f8fafc; margin: 0;'>{subsistema}</h4>
+                    <div style='font-size: 28px; font-weight: bold; color: {cor}; margin: 10px 0;'>{valor_util:.1f}%</div>
+                    <div style='color: #94a3b8; font-size: 12px;'>Valor Útil Médio</div>
+                    <div style='color: #94a3b8; margin-top: 5px;'>EAR: {ear_porcentagem:.1f}%</div>
+                    <div style='color: #94a3b8; font-size: 12px;'>{dados['quantidade']} Reservatórios</div>
                 </div>
             """, unsafe_allow_html=True)
+            
+            # Mostrar detalhes dos reservatórios
+            with st.expander("Ver Detalhes"):
+                for reservatorio in dados['reservatorios']:
+                    st.markdown(f"""
+                        <div style='background-color: #1e293b; padding: 10px; border-radius: 8px; margin: 5px 0;'>
+                            <div style='color: #f8fafc; font-weight: bold;'>{reservatorio['nome']}</div>
+                            <div style='color: #94a3b8; font-size: 12px;'>Bacia: {reservatorio['bacia']}</div>
+                            <div style='color: #94a3b8;'>Valor Útil: {reservatorio['valor_util']:.1f}%</div>
+                        </div>
+                    """, unsafe_allow_html=True)
 
-# Informações do Sistema e Rodapé
+# Rodapé com informações do sistema
 st.markdown("""
     <div style='background: linear-gradient(90deg, #1e293b, #0f172a); padding: 20px; border-radius: 12px; margin-top: 24px; box-shadow: 0 4px 6px rgba(0,0,0,0.3);'>
         <h4 style='color: #f8fafc; margin-bottom: 12px;'>ℹ️ Informações do Sistema</h4>
