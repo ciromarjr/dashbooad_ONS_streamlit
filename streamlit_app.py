@@ -6,21 +6,21 @@ import requests
 from datetime import datetime, timedelta
 import numpy as np
 
-# Configuração da página
+# Page configuration
 st.set_page_config(
     page_title="Sistema Elétrico Brasileiro",
     layout="wide",
     initial_sidebar_state="collapsed"
 )
 
-# Cores e estilos modernos
+# Keep original colors and styles
 BACKGROUND_COLOR = "#0f172a"  # Slate 900
 CARD_COLOR = "#1e293b"        # Slate 800
 TEXT_COLOR = "#f8fafc"        # Slate 50
 GRID_COLOR = "#334155"        # Slate 700
 ACCENT_COLOR = "#3b82f6"      # Blue 500
 
-# Cores para fontes de energia
+# Original colors for energy sources
 ENERGY_COLORS = {
     'Hidráulica': '#60A5FA',    # Blue 400
     'Eólica': '#34D399',        # Emerald 400
@@ -30,67 +30,80 @@ ENERGY_COLORS = {
     'Carga': '#EC4899'          # Pink 400
 }
 
-# Funções de obtenção de dados
+# Data retrieval functions (improved)
 @st.cache_data(ttl=20)
 def get_data(url):
     try:
-        response = requests.get(url)
-        if response.status_code == 200:
-            if response.content and response.content.strip():
-                data = response.json()
-                if isinstance(data, list) and data:
-                    df = pd.DataFrame(data)
-                    if not df.empty:
-                        df['instante'] = pd.to_datetime(df['instante'], errors='coerce')
-                        df = df.dropna(subset=['instante'])
-                        df['geracao'] = df['geracao']
-                        return df
+        response = requests.get(url, timeout=5)
+        if response.status_code == 200 and response.content and response.content.strip():
+            data = response.json()
+            if isinstance(data, list) and data:
+                df = pd.DataFrame(data)
+                if not df.empty:
+                    df['instante'] = pd.to_datetime(df['instante'], errors='coerce')
+                    df = df.dropna(subset=['instante'])
+                    return df
+        return pd.DataFrame(columns=['instante', 'geracao'])
     except Exception as e:
         st.error(f"Erro ao carregar dados: {e}")
-    return None
+        return pd.DataFrame(columns=['instante', 'geracao'])
 
 @st.cache_data(ttl=20)
 def get_carga_data():
     url = "https://integra.ons.org.br/api/energiaagora/Get/Carga_SIN_json"
     try:
-        response = requests.get(url)
+        response = requests.get(url, timeout=5)
         if response.status_code == 200:
             data = response.json()
             df = pd.DataFrame(data)
             df['instante'] = pd.to_datetime(df['instante'])
             return df
+        return pd.DataFrame(columns=['instante', 'carga'])
     except Exception as e:
         st.error(f"Erro ao carregar dados de carga: {e}")
-    return None
+        return pd.DataFrame(columns=['instante', 'carga'])
+    
+@st.cache_data(ttl=20)
+def get_regional_carga_data(region):
+    url = f"https://integra.ons.org.br/api/energiaagora/Get/Carga_{region}_json"
+    try:
+        response = requests.get(url, timeout=5)
+        if response.status_code == 200:
+            data = response.json()
+            df = pd.DataFrame(data)
+            df['instante'] = pd.to_datetime(df['instante'])
+            return df
+        return pd.DataFrame(columns=['instante', 'carga'])
+    except Exception as e:
+        st.error(f"Erro ao carregar dados de carga regional: {e}")
+        return pd.DataFrame(columns=['instante', 'carga'])
 
 @st.cache_data(ttl=20)
 def get_balanco_energetico():
     url = "https://integra.ons.org.br/api/energiaagora/GetBalancoEnergetico/null"
     try:
-        response = requests.get(url)
-        if response.status_code == 200:
-            return response.json()
+        response = requests.get(url, timeout=5)
+        return response.json() if response.status_code == 200 else None
     except Exception as e:
         st.error(f"Erro ao carregar balanço energético: {e}")
-    return None
+        return None
 
 @st.cache_data(ttl=20)
 def get_situacao_reservatorios():
     url = "https://integra.ons.org.br/api/energiaagora/Get/SituacaoDosReservatorios"
     try:
-        response = requests.get(url)
-        if response.status_code == 200:
-            return response.json()
+        response = requests.get(url, timeout=5)
+        return response.json() if response.status_code == 200 else None
     except Exception as e:
         st.error(f"Erro ao carregar situação dos reservatórios: {e}")
-    return None
+        return None
 
 @st.cache_data(ttl=20)
 def process_reservatorio_data(data):
     if not data:
         return None
         
-    # Agrupar por subsistema
+    # Group by subsystem
     subsistemas = {}
     for reservatorio in data:
         subsistema = reservatorio.get('Subsistema')
@@ -103,7 +116,7 @@ def process_reservatorio_data(data):
                 'ear_maxima': 0
             }
         
-        # Adicionar informações do reservatório
+        # Add reservoir information
         subsistemas[subsistema]['reservatorios'].append({
             'nome': reservatorio.get('Reservatorio'),
             'valor_util': reservatorio.get('ReservatorioValorUtil', 0),
@@ -113,13 +126,13 @@ def process_reservatorio_data(data):
             'bacia': reservatorio.get('Bacia')
         })
         
-        # Atualizar totais do subsistema
+        # Update subsystem totals
         subsistemas[subsistema]['quantidade'] += 1
         subsistemas[subsistema]['ear_verificada'] += reservatorio.get('ReservatorioEARVerificadaMWMes', 0)
         subsistemas[subsistema]['ear_maxima'] += reservatorio.get('ReservatorioMax', 0)
         subsistemas[subsistema]['valor_util_total'] += reservatorio.get('ReservatorioValorUtil', 0)
     
-    # Calcular médias para cada subsistema
+    # Calculate averages for each subsystem
     for subsistema in subsistemas:
         if subsistemas[subsistema]['quantidade'] > 0:
             subsistemas[subsistema]['valor_util_medio'] = (
@@ -169,7 +182,7 @@ def load_data():
     for fonte, regioes in urls.items():
         for regiao, url in regioes.items():
             df = get_data(url)
-            if df is not None:
+            if df is not None and not df.empty:
                 key = f'{fonte} - {regiao}'
                 dataframes[key] = df
     
@@ -180,29 +193,47 @@ def load_data():
 
 def process_data(dataframes):
     if not dataframes:
-        return None, None
+        return {}, {}, {}
     
-    # Agregando dados por fonte
+    # Aggregate data by source
     fonte_totals = {}
     for key, df in dataframes.items():
+        if df.empty:
+            continue
         fonte = key.split(' - ')[0]
         if fonte not in fonte_totals:
-            fonte_totals[fonte] = df['geracao'].iloc[-1] if not df.empty else 0
+            fonte_totals[fonte] = df['geracao'].iloc[-1]
         else:
-            fonte_totals[fonte] += df['geracao'].iloc[-1] if not df.empty else 0
+            fonte_totals[fonte] += df['geracao'].iloc[-1]
     
-    # Preparando dados para gráfico de 24h
+    # Prepare data for 24h chart
     timeline_data = {}
     for key, df in dataframes.items():
+        if df.empty:
+            continue
         fonte = key.split(' - ')[0]
-        if not df.empty:
-            if fonte not in timeline_data:
-                timeline_data[fonte] = df.copy()
-            else:
-                timeline_data[fonte]['geracao'] += df['geracao']
+        if fonte not in timeline_data:
+            timeline_data[fonte] = df.copy()
+        else:
+            timeline_data[fonte]['geracao'] += df['geracao']
     
-    return fonte_totals, timeline_data
-# Estilo personalizado moderno
+    # Prepare regional data for the new regional view
+    regional_data = {}
+    for key, df in dataframes.items():
+        if df.empty:
+            continue
+        fonte, regiao = key.split(' - ')
+        if regiao not in regional_data:
+            regional_data[regiao] = {}
+        
+        if fonte not in regional_data[regiao]:
+            regional_data[regiao][fonte] = df['geracao'].iloc[-1]
+        else:
+            regional_data[regiao][fonte] += df['geracao'].iloc[-1]
+    
+    return fonte_totals, timeline_data, regional_data
+
+# Custom style keeping original colors
 st.markdown("""
     <style>
     .main {
@@ -213,181 +244,336 @@ st.markdown("""
     }
     .metric-container {
         background-color: #1e293b;
-        border-radius: 12px;
-        padding: 20px;
+        border-radius: 8px;
+        padding: 10px;
         box-shadow: 0 4px 6px rgba(0,0,0,0.3);
         transition: transform 0.3s ease;
-    }
-    .metric-container:hover {
-        transform: translateY(-2px);
+        height: 100%;
     }
     .metric-value {
-        font-size: 28px;
+        font-size: 20px;
         font-weight: bold;
         color: #f8fafc;
     }
     .metric-label {
-        font-size: 14px;
+        font-size: 12px;
         color: #94a3b8;
     }
     .chart-container {
         background-color: #1e293b;
-        border-radius: 12px;
-        padding: 20px;
-        margin: 10px 0;
+        border-radius: 8px;
+        padding: 15px;
+        margin: 5px 0;
         box-shadow: 0 4px 6px rgba(0,0,0,0.3);
     }
     .section-header {
         color: #f8fafc;
-        font-size: 24px;
+        font-size: 18px;
         font-weight: bold;
-        margin: 20px 0;
-        padding-bottom: 10px;
+        margin: 10px 0;
+        padding-bottom: 5px;
         border-bottom: 2px solid #3b82f6;
     }
     .reservoir-card {
         background-color: #1e293b;
-        border-radius: 12px;
-        padding: 15px;
-        margin: 5px;
+        border-radius: 8px;
+        padding: 10px;
+        margin: 5px 0;
         box-shadow: 0 4px 6px rgba(0,0,0,0.3);
-        transition: transform 0.3s ease;
+        height: 100%;
     }
-    .reservoir-card:hover {
-        transform: translateY(-2px);
+    .region-card {
+        background-color: #1e293b;
+        border-radius: 8px;
+        padding: 10px;
+        margin: 5px 0;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        height: 100%;
+    }
+    /* Reduce spacing for better fit */
+    .block-container {
+        padding-top: 0.5rem;
+        padding-bottom: 0.5rem;
+        padding-left: 0.5rem;
+        padding-right: 0.5rem;
+    }
+    .stPlotlyChart {
+        padding: 0 !important;
+    }
+    /* Hide "Made with Streamlit" footer */
+    footer {
+        display: none;
+    }
+    .stHeading, .stMarkdown p {
+        padding-bottom: 0.25rem !important;
+        margin-bottom: 0.25rem !important;
     }
     </style>
 """, unsafe_allow_html=True)
 
-# Header moderno
-st.markdown("""
-    <div style='background: linear-gradient(90deg, #1e293b, #0f172a); padding: 30px; border-radius: 12px; margin-bottom: 24px; box-shadow: 0 4px 6px rgba(0,0,0,0.3);'>
-        <h1 style='color: #f8fafc; margin: 0; display: flex; align-items: center;'>
-            <span style='font-size: 32px; margin-right: 10px;'>⚡</span>
+# Get current time for display
+current_time = datetime.now().strftime('%H:%M:%S')
+current_date_time = datetime.now().strftime('%d/%m/%Y %H:%M:%S')
+
+# Streamlined header for monitoring screen
+st.markdown(f"""
+    <div style='background: linear-gradient(90deg, #1e293b, #0f172a); padding: 15px; border-radius: 8px; margin-bottom: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.3);'>
+        <h1 style='color: #f8fafc; margin: 0; display: flex; align-items: center; font-size: 24px;'>
+            <span style='font-size: 24px; margin-right: 10px;'>⚡</span>
             Sistema Elétrico Brasileiro
+            <span style='font-size: 14px; margin-left: auto; color: #94a3b8;'>
+                Atualizado: {current_time}
+            </span>
         </h1>
-        <p style='color: #94a3b8; margin: 10px 0 0 0;'>Monitoramento em Tempo Real</p>
     </div>
 """, unsafe_allow_html=True)
 
-# Carregando dados
+# Load data
 dataframes, balanco, reservatorios = load_data()
 carga_data = get_carga_data()
-fonte_totals, timeline_data = process_data(dataframes)
+fonte_totals, timeline_data, regional_data = process_data(dataframes)
 
-# Métricas principais em cards modernos
-if fonte_totals and carga_data is not None:
-    total_geracao = sum(fonte_totals.values())
-    total_carga = carga_data['carga'].iloc[-1] if not carga_data.empty else 0
-    renovaveis = (fonte_totals.get('Hidráulica', 0) + fonte_totals.get('Eólica', 0) + 
-                  fonte_totals.get('Solar', 0))
-    percentual_renovavel = (renovaveis / total_geracao * 100) if total_geracao > 0 else 0
-    
-    col1, col2, col3, col4, col5 = st.columns(5)
-    
-    with col1:
-        st.markdown("""
-            <div class='metric-container'>
-                <div class='metric-value'>💡 {:,.0f} MW</div>
-                <div class='metric-label'>Geração Total</div>
-            </div>
-        """.format(total_geracao), unsafe_allow_html=True)
-    
-    with col2:
-        st.markdown("""
-            <div class='metric-container'>
-                <div class='metric-value'>⚡ {:,.0f} MW</div>
-                <div class='metric-label'>Carga Total</div>
-            </div>
-        """.format(total_carga), unsafe_allow_html=True)
-    
-    with col3:
-        st.markdown("""
-            <div class='metric-container'>
-                <div class='metric-value'>🌱 {:.1f}%</div>
-                <div class='metric-label'>
-            <div class='metric-label'>Energia Renovável</div>
-            </div>
-        """.format(percentual_renovavel), unsafe_allow_html=True)
-    
-    
-    with col4:
-        if reservatorios:
-            dados_reservatorios = process_reservatorio_data(reservatorios)
-            nivel_medio = sum(s['valor_util_medio'] for s in dados_reservatorios.values()) / len(dados_reservatorios)
-            st.markdown("""
-                <div class='metric-container'>
-                    <div class='metric-value'>💧 {:.1f}%</div>
-                    <div class='metric-label'>Nível Reservatórios</div>
-                </div>
-            """.format(nivel_medio), unsafe_allow_html=True)
-    
-    with col5:
-        margem = ((total_geracao - total_carga) / total_geracao * 100) if total_geracao > 0 else 0
-        st.markdown("""
-            <div class='metric-container'>
-                <div class='metric-value'>📊 {:.1f}%</div>
-                <div class='metric-label'>Margem de Capacidade</div>
-            </div>
-        """.format(margem), unsafe_allow_html=True)
+# Load regional load data
+norte_carga = get_regional_carga_data("Norte")
+nordeste_carga = get_regional_carga_data("Nordeste")
+sudeste_carga = get_regional_carga_data("SudesteECentroOeste")
+sul_carga = get_regional_carga_data("Sul")
 
-# Gráficos principais
-col1, col2 = st.columns(2)
+# Main layout with two columns
+col1, col2 = st.columns([1, 1])
 
+# Left column: System overview and regional data
 with col1:
-    st.markdown("<h3 class='section-header'>Matriz Elétrica Atual</h3>", unsafe_allow_html=True)
-    if fonte_totals:
-        fig_rosca = go.Figure(data=[go.Pie(
-            labels=list(fonte_totals.keys()),
-            values=list(fonte_totals.values()),
-            hole=.75,
-            marker_colors=[ENERGY_COLORS[fonte] for fonte in fonte_totals.keys()],
-            textinfo='label+percent',
-            textposition='outside',
-            textfont=dict(color=TEXT_COLOR)
-        )])
+    # Key metrics at the top
+    if fonte_totals and not carga_data.empty:
+        total_geracao = sum(fonte_totals.values())
+        total_carga = carga_data['carga'].iloc[-1] if 'carga' in carga_data else 0
+        renovaveis = (fonte_totals.get('Hidráulica', 0) + fonte_totals.get('Eólica', 0) + 
+                      fonte_totals.get('Solar', 0))
+        percentual_renovavel = (renovaveis / total_geracao * 100) if total_geracao > 0 else 0
+        margem = ((total_geracao - total_carga) / total_geracao * 100) if total_geracao > 0 else 0
+        margem_color = "#34D399" if margem > 5 else "#FBBF24" if margem > 0 else "#F87171"
         
-        fig_rosca.add_annotation(
-            text=f'Total<br>{total_geracao:,.0f}<br>MW',
-            x=0.5, y=0.5,
-            font=dict(size=16, color=TEXT_COLOR, family='Arial Black'),
-            showarrow=False
+        metric_cols = st.columns(4)
+        
+        with metric_cols[0]:
+            st.markdown(f"""
+                <div class='metric-container'>
+                    <div class='metric-value'>💡 {total_geracao:,.0f} MW</div>
+                    <div class='metric-label'>Geração Total</div>
+                </div>
+            """, unsafe_allow_html=True)
+        
+        with metric_cols[1]:
+            st.markdown(f"""
+                <div class='metric-container'>
+                    <div class='metric-value'>⚡ {total_carga:,.0f} MW</div>
+                    <div class='metric-label'>Carga Total</div>
+                </div>
+            """, unsafe_allow_html=True)
+        
+        with metric_cols[2]:
+            st.markdown(f"""
+                <div class='metric-container'>
+                    <div class='metric-value'>🌱 {percentual_renovavel:.1f}%</div>
+                    <div class='metric-label'>Energia Renovável</div>
+                </div>
+            """, unsafe_allow_html=True)
+        
+        with metric_cols[3]:
+            st.markdown(f"""
+                <div class='metric-container'>
+                    <div class='metric-value' style='color: {margem_color};'>📊 {margem:.1f}%</div>
+                    <div class='metric-label'>Margem</div>
+                </div>
+            """, unsafe_allow_html=True)
+    
+    # Matrix with sources breakdown
+    st.markdown("<h3 class='section-header'>Matriz Elétrica Atual</h3>", unsafe_allow_html=True)
+    
+    if fonte_totals:
+        fig_matriz = go.Figure()
+        
+        # Sort to ensure Hydro is at the base (first)
+        sorted_keys = sorted(fonte_totals.keys(), key=lambda x: 0 if x == 'Hidráulica' else 1)
+        
+        # Create a single stacked bar
+        for fonte in sorted_keys:
+            fig_matriz.add_trace(go.Bar(
+                x=['Geração Atual'],
+                y=[fonte_totals[fonte]],
+                name=fonte,
+                marker_color=ENERGY_COLORS[fonte],
+                text=f"{fonte}: {fonte_totals[fonte]:,.0f} MW",
+                textposition="inside",
+                insidetextanchor="middle",
+                width=0.6
+            ))
+        
+        # Add total annotation at the top
+        fig_matriz.add_annotation(
+            x='Geração Atual', y=sum(fonte_totals.values()) + (sum(fonte_totals.values()) * 0.05),
+            text=f"Total: {sum(fonte_totals.values()):,.0f} MW",
+            showarrow=False,
+            font=dict(size=14, color="#f8fafc")
         )
         
-        fig_rosca.update_layout(
-            showlegend=True,
+        # Customize layout
+        fig_matriz.update_layout(
+            template='plotly_dark',
             paper_bgcolor=CARD_COLOR,
             plot_bgcolor=CARD_COLOR,
-            margin=dict(t=0, b=0, l=0, r=0),
-            height=400,
+            margin=dict(t=30, b=30, l=30, r=30),
+            height=300,
+            barmode='stack',
             legend=dict(
                 orientation="h",
                 yanchor="bottom",
                 y=-0.2,
                 xanchor="center",
                 x=0.5,
-                font=dict(color=TEXT_COLOR)
+                font=dict(size=11, color=TEXT_COLOR)
+            ),
+            xaxis=dict(
+                showgrid=False,
+                showticklabels=False
+            ),
+            yaxis=dict(
+                showgrid=True,
+                gridcolor=GRID_COLOR,
+                title="MW",
+                titlefont=dict(color=TEXT_COLOR, size=12),
+                tickfont=dict(color=TEXT_COLOR, size=10)
             )
         )
         
-        st.plotly_chart(fig_rosca, use_container_width=True)
-
-with col2:
-    st.markdown("<h3 class='section-header'>Geração vs Carga (24h)</h3>", unsafe_allow_html=True)
-    if timeline_data and carga_data is not None:
-        fig = go.Figure()
+        st.plotly_chart(fig_matriz, use_container_width=True)
+    
+    # Regional load section
+    st.markdown("<h3 class='section-header'>Carga por Região</h3>", unsafe_allow_html=True)
+    
+    # Get latest values for each region
+    region_data = {
+        "Norte": norte_carga['carga'].iloc[-1] if not norte_carga.empty else 0,
+        "Nordeste": nordeste_carga['carga'].iloc[-1] if not nordeste_carga.empty else 0,
+        "Sudeste/Centro-Oeste": sudeste_carga['carga'].iloc[-1] if not sudeste_carga.empty else 0,
+        "Sul": sul_carga['carga'].iloc[-1] if not sul_carga.empty else 0
+    }
+    
+    # Create regional load visualization
+    fig_regions = go.Figure()
+    regions = list(region_data.keys())
+    values = list(region_data.values())
+    colors = ['#60A5FA', '#34D399', '#F87171', '#FBBF24']
+    
+    fig_regions.add_trace(go.Bar(
+        x=regions,
+        y=values,
+        marker_color=colors,
+        text=[f"{v:,.0f} MW" for v in values],
+        textposition="inside"
+    ))
+    
+    fig_regions.update_layout(
+        template='plotly_dark',
+        paper_bgcolor=CARD_COLOR,
+        plot_bgcolor=CARD_COLOR,
+        margin=dict(t=20, b=30, l=30, r=30),
+        height=300,
+        xaxis=dict(
+            title="Região",
+            titlefont=dict(color=TEXT_COLOR, size=12),
+            tickfont=dict(color=TEXT_COLOR, size=10)
+        ),
+        yaxis=dict(
+            title="Carga (MW)",
+            titlefont=dict(color=TEXT_COLOR, size=12),
+            tickfont=dict(color=TEXT_COLOR, size=10),
+            showgrid=True,
+            gridcolor=GRID_COLOR
+        )
+    )
+    
+    st.plotly_chart(fig_regions, use_container_width=True)
+    
+    # Regional load timeline
+    if not norte_carga.empty and not nordeste_carga.empty and not sudeste_carga.empty and not sul_carga.empty:
+        fig_regional_timeline = go.Figure()
         
-        # Adicionando linha de carga
-        fig.add_trace(go.Scatter(
-            x=carga_data['instante'],
-            y=carga_data['carga'],
-            name='Carga Total',
-            line=dict(color=ENERGY_COLORS['Carga'], width=3, dash='dot'),
+        # Add a trace for each region
+        fig_regional_timeline.add_trace(go.Scatter(
+            x=norte_carga['instante'],
+            y=norte_carga['carga'],
+            name="Norte",
+            line=dict(color='#60A5FA', width=2)
         ))
         
-        # Adicionando área empilhada de geração por fonte
-        for fonte, df in timeline_data.items():
-            fig.add_trace(go.Scatter(
+        fig_regional_timeline.add_trace(go.Scatter(
+            x=nordeste_carga['instante'],
+            y=nordeste_carga['carga'],
+            name="Nordeste",
+            line=dict(color='#34D399', width=2)
+        ))
+        
+        fig_regional_timeline.add_trace(go.Scatter(
+            x=sudeste_carga['instante'],
+            y=sudeste_carga['carga'],
+            name="Sudeste/CO",
+            line=dict(color='#F87171', width=2)
+        ))
+        
+        fig_regional_timeline.add_trace(go.Scatter(
+            x=sul_carga['instante'],
+            y=sul_carga['carga'],
+            name="Sul",
+            line=dict(color='#FBBF24', width=2)
+        ))
+        
+        fig_regional_timeline.update_layout(
+            template='plotly_dark',
+            paper_bgcolor=CARD_COLOR,
+            plot_bgcolor=CARD_COLOR,
+            margin=dict(t=20, b=40, l=30, r=30),
+            height=300,
+            hovermode='x unified',
+            legend=dict(
+                orientation="h",
+                yanchor="bottom",
+                y=-0.15,
+                xanchor="center",
+                x=0.5,
+                font=dict(size=10, color=TEXT_COLOR)
+            ),
+            xaxis=dict(
+                title="Hora",
+                titlefont=dict(color=TEXT_COLOR, size=12),
+                tickfont=dict(color=TEXT_COLOR, size=10),
+                showgrid=True,
+                gridcolor=GRID_COLOR
+            ),
+            yaxis=dict(
+                title="Carga (MW)",
+                titlefont=dict(color=TEXT_COLOR, size=12),
+                tickfont=dict(color=TEXT_COLOR, size=10),
+                showgrid=True,
+                gridcolor=GRID_COLOR
+            )
+        )
+        
+        st.plotly_chart(fig_regional_timeline, use_container_width=True)
+
+# Right column: Generation vs Load and Reservoirs status
+with col2:
+    # Generation vs Load graph
+    st.markdown("<h3 class='section-header'>Geração vs Carga (24h)</h3>", unsafe_allow_html=True)
+    
+    if timeline_data and not carga_data.empty:
+        fig_gen_load = go.Figure()
+        
+        # Add stacked area for generation by source (Hydro at the base)
+        for fonte in sorted(timeline_data.keys(), key=lambda x: 0 if x == 'Hidráulica' else 1):
+            df = timeline_data[fonte]
+            fig_gen_load.add_trace(go.Scatter(
                 x=df['instante'],
                 y=df['geracao'],
                 name=fonte,
@@ -396,181 +582,170 @@ with col2:
                 fillcolor=ENERGY_COLORS.get(fonte, '#FFFFFF')
             ))
         
-        fig.update_layout(
+        # Add load line over the stacked area
+        fig_gen_load.add_trace(go.Scatter(
+            x=carga_data['instante'],
+            y=carga_data['carga'],
+            name='Carga Total',
+            line=dict(color=ENERGY_COLORS['Carga'], width=3, dash='solid'),
+        ))
+        
+        fig_gen_load.update_layout(
             template='plotly_dark',
             paper_bgcolor=CARD_COLOR,
             plot_bgcolor=CARD_COLOR,
-            margin=dict(t=20, b=20, l=20, r=20),
+            margin=dict(t=20, b=40, l=30, r=20),
             height=400,
             hovermode='x unified',
             legend=dict(
                 orientation="h",
                 yanchor="bottom",
-                y=-0.2,
+                y=-0.15,
                 xanchor="center",
-                x=0.5
+                x=0.5,
+                font=dict(size=10, color=TEXT_COLOR)
             ),
             xaxis=dict(
                 showgrid=True,
                 gridcolor=GRID_COLOR,
-                title="Hora"
+                title="Hora",
+                titlefont=dict(color=TEXT_COLOR, size=12),
+                tickfont=dict(color=TEXT_COLOR, size=10)
             ),
             yaxis=dict(
                 showgrid=True,
                 gridcolor=GRID_COLOR,
-                title="MW"
+                title="MW",
+                titlefont=dict(color=TEXT_COLOR, size=12),
+                tickfont=dict(color=TEXT_COLOR, size=10)
             )
         )
         
-        st.plotly_chart(fig, use_container_width=True)
-
-# Seção de Fontes Renováveis
-st.markdown("<h3 class='section-header'>Geração Renovável por Região</h3>", unsafe_allow_html=True)
-col1, col2 = st.columns(2)
-
-with col1:
-    st.markdown("<h4 style='color: #f8fafc;'>Geração Eólica</h4>", unsafe_allow_html=True)
-    eolica_data = {k: v for k, v in dataframes.items() if 'Eólica' in k}
-    if eolica_data:
-        fig_eolica = go.Figure()
-        
-        for regiao, df in eolica_data.items():
-            regiao_nome = regiao.split(' - ')[1]
-            fig_eolica.add_trace(go.Scatter(
-                x=df['instante'],
-                y=df['geracao'],
-                name=regiao_nome,
-                line=dict(width=2)
-            ))
-        
-        fig_eolica.update_layout(
-            template='plotly_dark',
-            paper_bgcolor=CARD_COLOR,
-            plot_bgcolor=CARD_COLOR,
-            margin=dict(t=20, b=20, l=20, r=20),
-            height=300,
-            hovermode='x unified',
-            legend=dict(
-                orientation="h",
-                yanchor="bottom",
-                y=-0.2,
-                xanchor="center",
-                x=0.5
-            ),
-            xaxis=dict(
-                showgrid=True,
-                gridcolor=GRID_COLOR,
-                title="Hora"
-            ),
-            yaxis=dict(
-                showgrid=True,
-                gridcolor=GRID_COLOR,
-                title="MW"
-            )
-        )
-        
-        st.plotly_chart(fig_eolica, use_container_width=True)
-
-with col2:
-    st.markdown("<h4 style='color: #f8fafc;'>Geração Solar</h4>", unsafe_allow_html=True)
-    solar_data = {k: v for k, v in dataframes.items() if 'Solar' in k}
-    if solar_data:
-        fig_solar = go.Figure()
-        
-        for regiao, df in solar_data.items():
-            regiao_nome = regiao.split(' - ')[1]
-            fig_solar.add_trace(go.Scatter(
-                x=df['instante'],
-                y=df['geracao'],
-                name=regiao_nome,
-                line=dict(width=2)
-            ))
-        
-        fig_solar.update_layout(
-            template='plotly_dark',
-            paper_bgcolor=CARD_COLOR,
-            plot_bgcolor=CARD_COLOR,
-            margin=dict(t=20, b=20, l=20, r=20),
-            height=300,
-            hovermode='x unified',
-            legend=dict(
-                orientation="h",
-                yanchor="bottom",
-                y=-0.2,
-                xanchor="center",
-                x=0.5
-            ),
-            xaxis=dict(
-                showgrid=True,
-                gridcolor=GRID_COLOR,
-                title="Hora"
-            ),
-            yaxis=dict(
-                showgrid=True,
-                gridcolor=GRID_COLOR,
-                title="MW"
-            )
-        )
-        
-        st.plotly_chart(fig_solar, use_container_width=True)
-
-# Status dos Reservatórios
-if reservatorios:
-    dados_reservatorios = process_reservatorio_data(reservatorios)
-    st.markdown("<h3 class='section-header'>Status dos Reservatórios por Subsistema</h3>", unsafe_allow_html=True)
+        st.plotly_chart(fig_gen_load, use_container_width=True)
     
-    cols = st.columns(len(dados_reservatorios))
-    for col, (subsistema, dados) in zip(cols, dados_reservatorios.items()):
-        with col:
-            valor_util = dados['valor_util_medio']
-            ear_porcentagem = dados['ear_porcentagem']
-            
-            # Definir cor baseado no nível
-            if valor_util >= 70:
-                cor = '#34D399'  # Verde
-            elif valor_util >= 40:
-                cor = '#FBBF24'  # Amarelo
-            else:
-                cor = '#F87171'  # Vermelho
+    # Reservoirs status
+    st.markdown("<h3 class='section-header'>Reservatórios por Subsistema</h3>", unsafe_allow_html=True)
+    
+    if reservatorios:
+        dados_reservatorios = process_reservatorio_data(reservatorios)
+        
+        # Create grid for reservoirs
+        num_subsistemas = len(dados_reservatorios)
+        res_cols = st.columns(min(num_subsistemas, 4))  # Maximum 4 columns
+        
+        for i, (subsistema, dados) in enumerate(dados_reservatorios.items()):
+            col_idx = i % len(res_cols)
+            with res_cols[col_idx]:
+                valor_util = dados['valor_util_medio']
+                ear_porcentagem = dados['ear_porcentagem']
                 
-            st.markdown(f"""
-                <div class='reservoir-card'>
-                    <h4 style='color: #f8fafc; margin: 0;'>{subsistema}</h4>
-                    <div style='font-size: 28px; font-weight: bold; color: {cor}; margin: 10px 0;'>{valor_util:.1f}%</div>
-                    <div style='color: #94a3b8; font-size: 12px;'>Valor Útil Médio</div>
-                    <div style='color: #94a3b8; margin-top: 5px;'>EAR: {ear_porcentagem:.1f}%</div>
-                    <div style='color: #94a3b8; font-size: 12px;'>{dados['quantidade']} Reservatórios</div>
-                </div>
-            """, unsafe_allow_html=True)
-            
-            # Mostrar detalhes dos reservatórios
-            with st.expander("Ver Detalhes"):
-                for reservatorio in dados['reservatorios']:
-                    st.markdown(f"""
-                        <div style='background-color: #1e293b; padding: 10px; border-radius: 8px; margin: 5px 0;'>
-                            <div style='color: #f8fafc; font-weight: bold;'>{reservatorio['nome']}</div>
-                            <div style='color: #94a3b8; font-size: 12px;'>Bacia: {reservatorio['bacia']}</div>
-                            <div style='color: #94a3b8;'>Valor Útil: {reservatorio['valor_util']:.1f}%</div>
+                # Define color based on level
+                if valor_util >= 70:
+                    cor = '#34D399'  # Green
+                elif valor_util >= 40:
+                    cor = '#FBBF24'  # Yellow
+                else:
+                    cor = '#F87171'  # Red
+                    
+                st.markdown(f"""
+                    <div class='reservoir-card'>
+                        <div style='font-size: 14px; font-weight: bold; color: #f8fafc;'>{subsistema}</div>
+                        <div style='display: flex; align-items: center; margin: 8px 0;'>
+                            <div style='flex: 1; background: #334155; height: 12px; border-radius: 6px; overflow: hidden;'>
+                                <div style='width: {valor_util}%; background: {cor}; height: 100%;'></div>
+                            </div>
+                            <div style='margin-left: 8px; font-size: 16px; font-weight: bold; color: {cor};'>{valor_util:.1f}%</div>
                         </div>
-                    """, unsafe_allow_html=True)
+                        <div style='color: #94a3b8; font-size: 12px;'>EAR: {ear_porcentagem:.1f}%</div>
+                    </div>
+                """, unsafe_allow_html=True)
+    
+    # Renewable generation by region
+    st.markdown("<h3 class='section-header'>Geração Renovável por Região</h3>", unsafe_allow_html=True)
+    
+    # Create visualization for renewable generation by region
+    eolica_data = {k: v for k, v in dataframes.items() if 'Eólica' in k}
+    solar_data = {k: v for k, v in dataframes.items() if 'Solar' in k}
+    
+    if eolica_data or solar_data:
+        # Create figure with subplots
+        fig_renovaveis = make_subplots(rows=2, cols=1, 
+                          subplot_titles=("Geração Eólica por Região", "Geração Solar por Região"),
+                          row_heights=[0.5, 0.5],
+                          vertical_spacing=0.08)
+        
+        # Add wind power traces
+        if eolica_data:
+            for regiao, df in eolica_data.items():
+                if df.empty:
+                    continue
+                regiao_nome = regiao.split(' - ')[1]
+                fig_renovaveis.add_trace(
+                    go.Scatter(
+                        x=df['instante'], 
+                        y=df['geracao'],
+                        name=f"Eólica - {regiao_nome}",
+                        line=dict(width=2),
+                        opacity=1 if regiao_nome == 'Nordeste' else 0.7
+                    ),
+                    row=1, col=1
+                )
+        
+        # Add solar power traces
+        if solar_data:
+            for regiao, df in solar_data.items():
+                if df.empty:
+                    continue
+                regiao_nome = regiao.split(' - ')[1]
+                fig_renovaveis.add_trace(
+                    go.Scatter(
+                        x=df['instante'], 
+                        y=df['geracao'],
+                        name=f"Solar - {regiao_nome}",
+                        line=dict(width=2),
+                        opacity=1 if regiao_nome == 'Nordeste' else 0.7
+                    ),
+                    row=2, col=1
+                )
+        
+        # Update layout
+        fig_renovaveis.update_layout(
+            template='plotly_dark',
+            paper_bgcolor=CARD_COLOR,
+            plot_bgcolor=CARD_COLOR,
+            margin=dict(t=40, b=20, l=30, r=20),
+            height=400,
+            hovermode='x unified',
+            legend=dict(
+                orientation="h",
+                yanchor="bottom",
+                y=-0.15,
+                xanchor="center",
+                x=0.5,
+                font=dict(size=10, color=TEXT_COLOR)
+            )
+        )
+        
+        fig_renovaveis.update_xaxes(showgrid=True, gridcolor=GRID_COLOR, tickfont=dict(color=TEXT_COLOR, size=10), row=1, col=1)
+        fig_renovaveis.update_xaxes(showgrid=True, gridcolor=GRID_COLOR, title="Hora", titlefont=dict(color=TEXT_COLOR, size=12), 
+                                    tickfont=dict(color=TEXT_COLOR, size=10), row=2, col=1)
+        
+        fig_renovaveis.update_yaxes(showgrid=True, gridcolor=GRID_COLOR, title="MW", titlefont=dict(color=TEXT_COLOR, size=12), 
+                                    tickfont=dict(color=TEXT_COLOR, size=10), row=1, col=1)
+        fig_renovaveis.update_yaxes(showgrid=True, gridcolor=GRID_COLOR, title="MW", titlefont=dict(color=TEXT_COLOR, size=12), 
+                                    tickfont=dict(color=TEXT_COLOR, size=10), row=2, col=1)
+        
+        st.plotly_chart(fig_renovaveis, use_container_width=True)
+    else:
+        st.info("Dados de geração renovável não disponíveis")
 
-# Rodapé com informações do sistema
-st.markdown("""
-    <div style='background: linear-gradient(90deg, #1e293b, #0f172a); padding: 20px; border-radius: 12px; margin-top: 24px; box-shadow: 0 4px 6px rgba(0,0,0,0.3);'>
-        <h4 style='color: #f8fafc; margin-bottom: 12px;'>ℹ️ Informações do Sistema</h4>
-        <div style='display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px;'>
-            <div>
-                <p style='color: #94a3b8; margin: 4px 0;'>• Dados atualizados a cada 20 segundos</p>
-                <p style='color: #94a3b8; margin: 4px 0;'>• Fonte: ONS (Operador Nacional do Sistema Elétrico)</p>
-            </div>
-            <div>
-                <p style='color: #94a3b8; margin: 4px 0;'>• Monitoramento em tempo real do SIN</p>
-                <p style='color: #94a3b8; margin: 4px 0;'>• Última atualização: {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}</p>
-            </div>
-            <div>
-                <p style='color: #94a3b8; margin: 4px 0;'>• Dados históricos das últimas 24 horas</p>
-                <p style='color: #94a3b8; margin: 4px 0;'>• Atualização automática ativa</p>
-            </div>
-        </div>
+# Compact footer with system information
+current_time = datetime.now().strftime('%H:%M:%S')
+current_date_time = datetime.now().strftime('%d/%m/%Y %H:%M:%S')
+st.markdown(f"""
+    <div style='background: linear-gradient(90deg, #1e293b, #0f172a); padding: 12px; border-radius: 8px; margin-top: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.3);'>
+        <p style='color: #94a3b8; margin: 0; font-size: 12px;'>
+            ℹ️ Dados: ONS | Atualização: {current_date_time} | Atualização automática a cada 20 segundos
+        </p>
     </div>
 """, unsafe_allow_html=True)
