@@ -14,7 +14,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# Paleta dark mode premium
+# Paleta dark mode original
 COLORS = {
     'background': '#0B0F19',
     'surface': '#1A1F2E',
@@ -29,14 +29,14 @@ COLORS = {
     'glow': '#4C1D95'
 }
 
-# Cores vibrantes para fontes de energia
+# Cores originais para fontes de energia
 ENERGY_COLORS = {
-    'Hidráulica': '#06B6D4',    # Cyan vibrante
-    'Eólica': '#10B981',        # Verde esmeralda
-    'Solar': '#F59E0B',         # Amarelo dourado
-    'Térmica': '#EF4444',       # Vermelho coral
-    'Nuclear': '#8B5CF6',       # Roxo vibrante
-    'Carga': '#E879F9'          # Rosa neon
+    'Hidráulica': '#60A5FA',    # Blue 400
+    'Eólica': '#34D399',        # Emerald 400
+    'Solar': '#FBBF24',         # Amber 400
+    'Térmica': '#F87171',       # Red 400
+    'Nuclear': '#A78BFA',       # Purple 400
+    'Carga': '#EC4899'          # Pink 400
 }
 
 # Funções de obtenção de dados
