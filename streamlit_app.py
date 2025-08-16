@@ -506,17 +506,6 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# Header impressionante
-current_time = datetime.now().strftime('%H:%M')
-current_date = datetime.now().strftime('%d de %B, %Y')
-
-st.markdown(f"""
-<div class="hero-header">
-    <div class="hero-title">⚡ Sistema Elétrico Brasileiro</div>
-    <div class="hero-subtitle">Monitoramento em tempo real • {current_date} • {current_time}</div>
-</div>
-""", unsafe_allow_html=True)
-
 # Carregar dados com loading elegante
 with st.spinner('🔄 Sincronizando dados em tempo real...'):
     dataframes = load_data()
