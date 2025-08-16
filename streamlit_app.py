@@ -392,11 +392,16 @@ with col1:
         trend_carga, tipo_trend_carga = calcular_tendencia(carga_data)
         
         # Calcular tendência total de geração
-        df_total_temp = pd.DataFrame({'instante': timeline_data['Hidráulica']['instante'] if 'Hidráulica' in timeline_data else []})
-        if not df_total_temp.empty:
-            df_total_temp['geracao'] = sum(timeline_data[fonte]['geracao'] for fonte in timeline_data.keys())
-            trend_total, tipo_trend_total = calcular_tendencia(df_total_temp)
-        else:
+        try:
+            if timeline_data:
+                # Usar a primeira fonte disponível como base para o timeline
+                primeira_fonte = next(iter(timeline_data.keys()))
+                df_total_temp = pd.DataFrame({'instante': timeline_data[primeira_fonte]['instante']})
+                df_total_temp['geracao'] = sum(timeline_data[fonte]['geracao'] for fonte in timeline_data.keys())
+                trend_total, tipo_trend_total = calcular_tendencia(df_total_temp)
+            else:
+                trend_total, tipo_trend_total = 0, "stable"
+        except Exception:
             trend_total, tipo_trend_total = 0, "stable"
         
         metric_cols = st.columns(4)
@@ -460,15 +465,18 @@ with col1:
         fontes_ordenadas = ['Hidráulica', 'Eólica', 'Solar', 'Térmica', 'Nuclear']
         
         for i, fonte in enumerate(fontes_ordenadas):
-            if fonte in fonte_totals:
+            if fonte in fonte_totals and fonte_totals[fonte] > 0:  # Só mostrar se tem geração
                 col_idx = i % len(fonte_cols)
                 with fonte_cols[col_idx]:
                     # Calcular tendência da fonte
-                    if fonte in timeline_data:
-                        trend_fonte, tipo_trend_fonte = calcular_tendencia(timeline_data[fonte])
-                        trend_icon = "📈" if tipo_trend_fonte == "up" else "📉" if tipo_trend_fonte == "down" else "➡️"
-                        trend_class = "trend-up" if tipo_trend_fonte == "up" else "trend-down" if tipo_trend_fonte == "down" else "trend-stable"
-                    else:
+                    try:
+                        if fonte in timeline_data and not timeline_data[fonte].empty:
+                            trend_fonte, tipo_trend_fonte = calcular_tendencia(timeline_data[fonte])
+                            trend_icon = "📈" if tipo_trend_fonte == "up" else "📉" if tipo_trend_fonte == "down" else "➡️"
+                            trend_class = "trend-up" if tipo_trend_fonte == "up" else "trend-down" if tipo_trend_fonte == "down" else "trend-stable"
+                        else:
+                            trend_fonte, trend_icon, trend_class = 0, "➡️", "trend-stable"
+                    except Exception:
                         trend_fonte, trend_icon, trend_class = 0, "➡️", "trend-stable"
                     
                     emoji_fonte = {"Hidráulica": "💧", "Eólica": "🌪️", "Solar": "☀️", "Térmica": "🔥", "Nuclear": "⚛️"}
@@ -486,62 +494,73 @@ with col1:
     st.markdown("<h3 class='section-header'>🔋 Matriz Elétrica Atual</h3>", unsafe_allow_html=True)
     
     if fonte_totals:
-        fig_matriz = go.Figure()
-        
-        # Ordenar para garantir que hidráulica fique na base
-        sorted_keys = sorted(fonte_totals.keys(), key=lambda x: 0 if x == 'Hidráulica' else 1)
-        
-        # Criar uma única barra empilhada
-        for fonte in sorted_keys:
-            fig_matriz.add_trace(go.Bar(
-                x=['Geração Atual'],
-                y=[fonte_totals[fonte]],
-                name=fonte,
-                marker_color=ENERGY_COLORS[fonte],
-                text=f"{fonte}: {fonte_totals[fonte]:,.0f} MW",
-                textposition="inside",
-                insidetextanchor="middle",
-                width=0.6
-            ))
-        
-        # Adicionar anotação total no topo
-        fig_matriz.add_annotation(
-            x='Geração Atual', y=sum(fonte_totals.values()) + (sum(fonte_totals.values()) * 0.05),
-            text=f"Total: {sum(fonte_totals.values()):,.0f} MW",
-            showarrow=False,
-            font=dict(size=16, color="#f8fafc", family="Arial Black")
-        )
-        
-        # Personalizar layout
-        fig_matriz.update_layout(
-            template='plotly_dark',
-            paper_bgcolor=CARD_COLOR,
-            plot_bgcolor=CARD_COLOR,
-            margin=dict(t=40, b=40, l=40, r=40),
-            height=350,
-            barmode='stack',
-            legend=dict(
-                orientation="h",
-                yanchor="bottom",
-                y=-0.2,
-                xanchor="center",
-                x=0.5,
-                font=dict(size=12, color=TEXT_COLOR)
-            ),
-            xaxis=dict(
-                showgrid=False,
-                showticklabels=False
-            ),
-            yaxis=dict(
-                showgrid=True,
-                gridcolor=GRID_COLOR,
-                title="MW",
-                titlefont=dict(color=TEXT_COLOR, size=14),
-                tickfont=dict(color=TEXT_COLOR, size=12)
+        try:
+            fig_matriz = go.Figure()
+            
+            # Ordenar para garantir que hidráulica fique na base (se disponível)
+            fontes_disponiveis = list(fonte_totals.keys())
+            if 'Hidráulica' in fontes_disponiveis:
+                sorted_keys = sorted(fontes_disponiveis, key=lambda x: 0 if x == 'Hidráulica' else 1)
+            else:
+                sorted_keys = fontes_disponiveis
+            
+            # Criar uma única barra empilhada
+            for fonte in sorted_keys:
+                if fonte_totals[fonte] > 0:  # Só adicionar fontes com geração
+                    fig_matriz.add_trace(go.Bar(
+                        x=['Geração Atual'],
+                        y=[fonte_totals[fonte]],
+                        name=fonte,
+                        marker_color=ENERGY_COLORS.get(fonte, '#94a3b8'),
+                        text=f"{fonte}: {fonte_totals[fonte]:,.0f} MW",
+                        textposition="inside",
+                        insidetextanchor="middle",
+                        width=0.6
+                    ))
+            
+            # Adicionar anotação total no topo
+            total_geracao = sum(v for v in fonte_totals.values() if v > 0)
+            fig_matriz.add_annotation(
+                x='Geração Atual', y=total_geracao + (total_geracao * 0.05),
+                text=f"Total: {total_geracao:,.0f} MW",
+                showarrow=False,
+                font=dict(size=16, color="#f8fafc", family="Arial Black")
             )
-        )
-        
-        st.plotly_chart(fig_matriz, use_container_width=True)
+            
+            # Personalizar layout
+            fig_matriz.update_layout(
+                template='plotly_dark',
+                paper_bgcolor=CARD_COLOR,
+                plot_bgcolor=CARD_COLOR,
+                margin=dict(t=40, b=40, l=40, r=40),
+                height=350,
+                barmode='stack',
+                legend=dict(
+                    orientation="h",
+                    yanchor="bottom",
+                    y=-0.2,
+                    xanchor="center",
+                    x=0.5,
+                    font=dict(size=12, color=TEXT_COLOR)
+                ),
+                xaxis=dict(
+                    showgrid=False,
+                    showticklabels=False
+                ),
+                yaxis=dict(
+                    showgrid=True,
+                    gridcolor=GRID_COLOR,
+                    title="MW",
+                    titlefont=dict(color=TEXT_COLOR, size=14),
+                    tickfont=dict(color=TEXT_COLOR, size=12)
+                )
+            )
+            
+            st.plotly_chart(fig_matriz, use_container_width=True)
+        except Exception as e:
+            st.error(f"Erro ao gerar matriz elétrica: {e}")
+    else:
+        st.warning("📊 Dados de geração não disponíveis")
 
 # Coluna direita: Geração vs Carga e status dos reservatórios
 with col2:
@@ -549,62 +568,74 @@ with col2:
     st.markdown("<h3 class='section-header'>📈 Geração vs Carga (24h)</h3>", unsafe_allow_html=True)
     
     if timeline_data and not carga_data.empty:
-        fig_gen_load = go.Figure()
-        
-        # Adicionar área empilhada para geração por fonte (Hidráulica na base)
-        for fonte in sorted(timeline_data.keys(), key=lambda x: 0 if x == 'Hidráulica' else 1):
-            df = timeline_data[fonte]
+        try:
+            fig_gen_load = go.Figure()
+            
+            # Adicionar área empilhada para geração por fonte (Hidráulica na base se disponível)
+            fontes_disponiveis = list(timeline_data.keys())
+            if 'Hidráulica' in fontes_disponiveis:
+                fontes_ordenadas = sorted(fontes_disponiveis, key=lambda x: 0 if x == 'Hidráulica' else 1)
+            else:
+                fontes_ordenadas = fontes_disponiveis
+            
+            for fonte in fontes_ordenadas:
+                df = timeline_data[fonte]
+                if not df.empty:
+                    fig_gen_load.add_trace(go.Scatter(
+                        x=df['instante'],
+                        y=df['geracao'],
+                        name=fonte,
+                        stackgroup='geracao',
+                        line=dict(width=0),
+                        fillcolor=ENERGY_COLORS.get(fonte, '#FFFFFF'),
+                        hovertemplate=f'<b>{fonte}</b><br>Hora: %{{x}}<br>Geração: %{{y:,.0f}} MW<extra></extra>'
+                    ))
+            
+            # Adicionar linha de carga sobre a área empilhada
             fig_gen_load.add_trace(go.Scatter(
-                x=df['instante'],
-                y=df['geracao'],
-                name=fonte,
-                stackgroup='geracao',
-                line=dict(width=0),
-                fillcolor=ENERGY_COLORS.get(fonte, '#FFFFFF'),
-                hovertemplate=f'<b>{fonte}</b><br>Hora: %{{x}}<br>Geração: %{{y:,.0f}} MW<extra></extra>'
+                x=carga_data['instante'],
+                y=carga_data['carga'],
+                name='Carga Total',
+                line=dict(color=ENERGY_COLORS['Carga'], width=4, dash='solid'),
+                hovertemplate='<b>Carga Total</b><br>Hora: %{x}<br>Carga: %{y:,.0f} MW<extra></extra>'
             ))
-        
-        # Adicionar linha de carga sobre a área empilhada
-        fig_gen_load.add_trace(go.Scatter(
-            x=carga_data['instante'],
-            y=carga_data['carga'],
-            name='Carga Total',
-            line=dict(color=ENERGY_COLORS['Carga'], width=4, dash='solid'),
-            hovertemplate='<b>Carga Total</b><br>Hora: %{x}<br>Carga: %{y:,.0f} MW<extra></extra>'
-        ))
-        
-        fig_gen_load.update_layout(
-            template='plotly_dark',
-            paper_bgcolor=CARD_COLOR,
-            plot_bgcolor=CARD_COLOR,
-            margin=dict(t=30, b=50, l=40, r=30),
-            height=450,
-            hovermode='x unified',
-            legend=dict(
-                orientation="h",
-                yanchor="bottom",
-                y=-0.15,
-                xanchor="center",
-                x=0.5,
-                font=dict(size=11, color=TEXT_COLOR)
-            ),
-            xaxis=dict(
-                showgrid=True,
-                gridcolor=GRID_COLOR,
-                title="Hora",
-                titlefont=dict(color=TEXT_COLOR, size=14),
-                tickfont=dict(color=TEXT_COLOR, size=12)
-            ),
-            yaxis=dict(
-                showgrid=True,
-                gridcolor=GRID_COLOR,
-                title="MW",
-                titlefont=dict(color=TEXT_COLOR, size=14),
-                tickfont=dict(color=TEXT_COLOR, size=12)
+            
+            fig_gen_load.update_layout(
+                template='plotly_dark',
+                paper_bgcolor=CARD_COLOR,
+                plot_bgcolor=CARD_COLOR,
+                margin=dict(t=30, b=50, l=40, r=30),
+                height=450,
+                hovermode='x unified',
+                legend=dict(
+                    orientation="h",
+                    yanchor="bottom",
+                    y=-0.15,
+                    xanchor="center",
+                    x=0.5,
+                    font=dict(size=11, color=TEXT_COLOR)
+                ),
+                xaxis=dict(
+                    showgrid=True,
+                    gridcolor=GRID_COLOR,
+                    title="Hora",
+                    titlefont=dict(color=TEXT_COLOR, size=14),
+                    tickfont=dict(color=TEXT_COLOR, size=12)
+                ),
+                yaxis=dict(
+                    showgrid=True,
+                    gridcolor=GRID_COLOR,
+                    title="MW",
+                    titlefont=dict(color=TEXT_COLOR, size=14),
+                    tickfont=dict(color=TEXT_COLOR, size=12)
+                )
             )
-        )
-        
-        st.plotly_chart(fig_gen_load, use_container_width=True)
+            
+            st.plotly_chart(fig_gen_load, use_container_width=True)
+        except Exception as e:
+            st.error(f"Erro ao gerar gráfico de geração vs carga: {e}")
+    else:
+        st.warning("📊 Dados de geração ou carga não disponíveis")
     
     # Status dos reservatórios
     st.markdown("<h3 class='section-header'>🏞️ Reservatórios por Subsistema</h3>", unsafe_allow_html=True)
