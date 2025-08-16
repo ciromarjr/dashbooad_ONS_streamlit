@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 import numpy as np
 import time
 
-# Configuração da página
+# Configuração da página para TV widescreen
 st.set_page_config(
     page_title="Sistema Elétrico Brasileiro",
     layout="wide",
@@ -169,10 +169,110 @@ st.markdown("""
         background: linear-gradient(135deg, #0B0F19 0%, #1A1F2E 100%);
         font-family: 'Inter', sans-serif;
         color: #F8FAFC;
+        padding: 0;
+        margin: 0;
     }
     
     .stApp {
         background: linear-gradient(135deg, #0B0F19 0%, #1A1F2E 100%);
+        padding: 0;
+        margin: 0;
+    }
+    
+    .block-container {
+        padding: 1rem 2rem;
+        max-width: none !important;
+        width: 100vw;
+        margin: 0;
+    }
+    
+    /* TV Widescreen adjustments */
+    .metric-card {
+        background: linear-gradient(135deg, #252B3A 0%, #2A3441 100%);
+        border: 1px solid #3B4252;
+        border-radius: 16px;
+        padding: 20px;
+        margin: 6px 0;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        position: relative;
+        overflow: hidden;
+        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+        height: 140px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+    }
+    
+    .metric-value {
+        font-size: 2.5rem;
+        font-weight: 800;
+        color: #F8FAFC;
+        margin-bottom: 4px;
+        line-height: 1;
+        text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+    }
+    
+    .metric-label {
+        font-size: 0.85rem;
+        color: #94A3B8;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        margin-bottom: 8px;
+    }
+    
+    .source-card {
+        background: linear-gradient(135deg, #252B3A 0%, #2A3441 100%);
+        border: 1px solid #3B4252;
+        border-radius: 12px;
+        padding: 16px;
+        margin: 4px 0;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        position: relative;
+        overflow: hidden;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        min-height: 70px;
+    }
+    
+    .section-title {
+        font-size: 1.3rem;
+        font-weight: 800;
+        color: #F8FAFC;
+        margin-bottom: 16px;
+        position: relative;
+        padding-left: 16px;
+    }
+    
+    /* Compact layout for TV */
+    .chart-container {
+        background: linear-gradient(135deg, #252B3A 0%, #2A3441 100%);
+        border: 1px solid #3B4252;
+        border-radius: 20px;
+        padding: 20px;
+        margin: 10px 0;
+        box-shadow: 0 12px 30px rgba(0, 0, 0, 0.3);
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .footer {
+        background: linear-gradient(135deg, #252B3A 0%, #2A3441 100%);
+        border: 1px solid #3B4252;
+        border-radius: 16px;
+        padding: 16px 24px;
+        margin-top: 20px;
+        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+    }
+    
+    .footer-content {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        color: #94A3B8;
+        font-size: 0.8rem;
     }
     
     .hero-header {
@@ -463,9 +563,11 @@ st.markdown("""
     }
     
     .block-container {
-        padding-top: 2rem;
-        padding-bottom: 2rem;
-        max-width: 1400px;
+        padding-top: 1rem;
+        padding-bottom: 1rem;
+        max-width: none;
+        padding-left: 1rem;
+        padding-right: 1rem;
     }
     
     .stPlotlyChart {
@@ -522,7 +624,7 @@ if fonte_totals and not carga_data.empty:
     margem = total_geracao - total_carga
     
     # Cards de métricas principais com design premium
-    col1, col2, col3, col4 = st.columns(4)
+    col1, col2, col3 = st.columns(3)
     
     with col1:
         st.markdown(f"""
@@ -564,26 +666,12 @@ if fonte_totals and not carga_data.empty:
         </div>
         """, unsafe_allow_html=True)
     
-    with col4:
-        margem_status = "good" if margem > 1000 else "warning" if margem > 0 else "critical"
-        margem_color = "#10B981" if margem > 1000 else "#F59E0B" if margem > 0 else "#EF4444"
-        st.markdown(f"""
-        <div class="metric-card">
-            <div class="metric-value">{margem:,.0f}</div>
-            <div class="metric-label">Margem (MW)</div>
-            <div class="metric-status">
-                <div class="status-indicator" style="background: {margem_color};"></div>
-                <span style="color: {margem_color};">{"Reserva Segura" if margem > 1000 else "Atenção" if margem > 0 else "Crítico"}</span>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    # Layout de duas colunas
-    col_left, col_right = st.columns([1.2, 2])
+    # Layout otimizado para TV widescreen
+    col_left, col_right = st.columns([1, 3])
     
     with col_left:
-        # Geração por fonte com design futurista
-        st.markdown('<div class="section-title">🔋 Geração por Fonte</div>', unsafe_allow_html=True)
+        # Geração por fonte - compacto para TV
+        st.markdown('<div class="section-title">🔋 Fontes</div>', unsafe_allow_html=True)
         
         # Ordenar fontes por geração
         fontes_ordenadas = sorted(fonte_totals.items(), key=lambda x: x[1], reverse=True)
@@ -593,7 +681,7 @@ if fonte_totals and not carga_data.empty:
                 # Calcular tendência
                 if fonte in timeline_data:
                     trend_val, trend_tipo = calcular_tendencia(timeline_data[fonte])
-                    trend_icon = "📈" if trend_tipo == "up" else "📉" if trend_tipo == "down" else "→"
+                    trend_icon = "↗" if trend_tipo == "up" else "↘" if trend_tipo == "down" else "→"
                     trend_class = f"trend-{trend_tipo}"
                 else:
                     trend_icon = "→"
@@ -606,56 +694,54 @@ if fonte_totals and not carga_data.empty:
                 st.markdown(f"""
                 <div class="source-card" style="--source-color: {source_color};">
                     <div>
-                        <div class="source-name">{fonte}</div>
-                        <div class="source-percentage">{percentual:.1f}% do total</div>
-                        <div class="trend-badge {trend_class}">
-                            {trend_icon} {abs(trend_val):.1f} MW/h
-                        </div>
+                        <div class="source-name" style="font-size: 1rem;">{fonte}</div>
+                        <div class="source-percentage" style="font-size: 0.8rem;">{percentual:.1f}%</div>
                     </div>
                     <div style="text-align: right;">
-                        <div class="source-value" style="color: {source_color};">{valor:,.0f}</div>
-                        <div style="font-size: 0.75rem; color: #94A3B8; margin-top: 4px;">MW</div>
+                        <div class="source-value" style="color: {source_color}; font-size: 1.3rem;">{valor:,.0f}</div>
+                        <div class="trend-badge {trend_class}" style="font-size: 0.7rem;">
+                            {trend_icon} {abs(trend_val):.0f}
+                        </div>
                     </div>
                 </div>
                 """, unsafe_allow_html=True)
         
-        # Composição da matriz com gráfico glassmorphism
-        st.markdown('<div class="section-title" style="margin-top: 40px;">📊 Composição da Matriz</div>', unsafe_allow_html=True)
+        # Composição da matriz - mais compacta
+        st.markdown('<div class="section-title" style="margin-top: 24px;">📊 Matriz</div>', unsafe_allow_html=True)
         
-        # Gráfico de rosca com design premium
+        # Gráfico de rosca menor para TV
         fig_pie = go.Figure(data=[go.Pie(
             labels=list(fonte_totals.keys()),
             values=list(fonte_totals.values()),
             hole=0.65,
             marker=dict(
                 colors=[ENERGY_COLORS.get(fonte, '#94A3B8') for fonte in fonte_totals.keys()],
-                line=dict(color='#252B3A', width=3)
+                line=dict(color='#252B3A', width=2)
             ),
             textinfo='percent',
-            textfont=dict(size=14, color='#F8FAFC', family='Inter'),
-            hovertemplate='<b style="color: %{color}">%{label}</b><br>%{value:,.0f} MW<br>%{percent}<extra></extra>'
+            textfont=dict(size=12, color='#F8FAFC', family='Inter'),
+            hovertemplate='<b>%{label}</b><br>%{value:,.0f} MW<extra></extra>'
         )])
         
         fig_pie.add_annotation(
-            text=f"<b style='color: #F8FAFC; font-size: 24px;'>{total_geracao:,.0f}</b><br><span style='color: #94A3B8; font-size: 16px;'>MW Total</span>",
+            text=f"<b>{total_geracao:,.0f}</b><br><span style='font-size:12px;'>MW</span>",
             x=0.5, y=0.5,
-            font=dict(family='Inter'),
+            font=dict(size=16, family='Inter', color='#F8FAFC'),
             showarrow=False
         )
         
         fig_pie.update_layout(
-            height=400,
-            margin=dict(t=20, b=20, l=20, r=20),
+            height=280,
+            margin=dict(t=10, b=10, l=10, r=10),
             paper_bgcolor='rgba(0,0,0,0)',
             plot_bgcolor='rgba(0,0,0,0)',
-            showlegend=False,
-            font=dict(family='Inter', color='#F8FAFC')
+            showlegend=False
         )
         
         st.plotly_chart(fig_pie, use_container_width=True)
     
     with col_right:
-        # Gráfico de Geração vs Carga com design premium
+        # Gráfico principal maximizado para TV
         st.markdown('<div class="section-title">📈 Geração vs Carga (24h)</div>', unsafe_allow_html=True)
         
         if timeline_data and not carga_data.empty:
@@ -678,7 +764,7 @@ if fonte_totals and not carga_data.empty:
                         stackgroup='geracao',
                         line=dict(width=0),
                         fillcolor=ENERGY_COLORS.get(fonte, '#94A3B8'),
-                        hovertemplate=f'<b style="color: {ENERGY_COLORS.get(fonte, "#94A3B8")}">{fonte}</b><br>%{{x|%H:%M}}<br>%{{y:,.0f}} MW<extra></extra>'
+                        hovertemplate=f'<b>{fonte}</b><br>%{{x|%H:%M}}<br>%{{y:,.0f}} MW<extra></extra>'
                     ))
             
             # Adicionar linha de carga com efeito neon
@@ -687,11 +773,11 @@ if fonte_totals and not carga_data.empty:
                 y=carga_data['carga'],
                 name='Carga Total',
                 line=dict(color='#E879F9', width=4, dash='solid'),
-                hovertemplate='<b style="color: #E879F9">Carga Total</b><br>%{x|%H:%M}<br>%{y:,.0f} MW<extra></extra>'
+                hovertemplate='<b>Carga Total</b><br>%{x|%H:%M}<br>%{y:,.0f} MW<extra></extra>'
             ))
             
             fig_gen_load.update_layout(
-                height=550,
+                height=600,  # Maior para TV
                 margin=dict(t=20, b=20, l=20, r=20),
                 paper_bgcolor='rgba(0,0,0,0)',
                 plot_bgcolor='rgba(37, 43, 58, 0.3)',
@@ -699,18 +785,18 @@ if fonte_totals and not carga_data.empty:
                 hoverlabel=dict(
                     bgcolor='rgba(37, 43, 58, 0.95)',
                     bordercolor='#3B4252',
-                    font=dict(color='#F8FAFC', family='Inter')
+                    font=dict(color='#F8FAFC', family='Inter', size=12)
                 ),
                 legend=dict(
                     orientation="h",
                     yanchor="bottom",
-                    y=-0.15,
+                    y=-0.12,
                     xanchor="center",
                     x=0.5,
                     bgcolor='rgba(37, 43, 58, 0.8)',
                     bordercolor='#3B4252',
                     borderwidth=1,
-                    font=dict(color='#F8FAFC', family='Inter')
+                    font=dict(color='#F8FAFC', family='Inter', size=12)
                 ),
                 xaxis=dict(
                     showgrid=True,
@@ -719,8 +805,7 @@ if fonte_totals and not carga_data.empty:
                     title="Horário",
                     titlefont=dict(color='#94A3B8', size=14, family='Inter'),
                     tickfont=dict(color='#94A3B8', size=12, family='Inter'),
-                    linecolor='#3B4252',
-                    zerolinecolor='#3B4252'
+                    linecolor='#3B4252'
                 ),
                 yaxis=dict(
                     showgrid=True,
@@ -729,28 +814,24 @@ if fonte_totals and not carga_data.empty:
                     title="Potência (MW)",
                     titlefont=dict(color='#94A3B8', size=14, family='Inter'),
                     tickfont=dict(color='#94A3B8', size=12, family='Inter'),
-                    linecolor='#3B4252',
-                    zerolinecolor='#3B4252'
-                ),
-                font=dict(family='Inter', color='#F8FAFC')
+                    linecolor='#3B4252'
+                )
             )
             
             st.plotly_chart(fig_gen_load, use_container_width=True)
     
-    # Estatísticas adicionais em cards horizontais
-    st.markdown('<div class="section-title" style="margin-top: 48px;">📊 Estatísticas do Sistema</div>', unsafe_allow_html=True)
-    
+    # Estatísticas adicionais compactas para TV
     col_stat1, col_stat2, col_stat3 = st.columns(3)
     
     with col_stat1:
         eficiencia = (total_carga / total_geracao * 100) if total_geracao > 0 else 0
         st.markdown(f"""
         <div class="metric-card">
-            <div class="metric-value" style="color: #06B6D4;">{eficiencia:.1f}%</div>
-            <div class="metric-label">Eficiência do Sistema</div>
+            <div class="metric-value" style="color: #06B6D4; font-size: 2rem;">{eficiencia:.1f}%</div>
+            <div class="metric-label">Eficiência</div>
             <div class="metric-status">
-                <div class="status-indicator status-good" style="background: #06B6D4;"></div>
-                <span style="color: #06B6D4;">Otimizada</span>
+                <div class="status-indicator" style="background: #06B6D4;"></div>
+                <span style="color: #06B6D4; font-size: 0.8rem;">Otimizada</span>
             </div>
         </div>
         """, unsafe_allow_html=True)
@@ -761,25 +842,25 @@ if fonte_totals and not carga_data.empty:
         cor_dominante = ENERGY_COLORS.get(fonte_dominante[0], '#94A3B8')
         st.markdown(f"""
         <div class="metric-card">
-            <div class="metric-value" style="color: {cor_dominante};">{percentual_dominante:.1f}%</div>
-            <div class="metric-label">Fonte Dominante</div>
+            <div class="metric-value" style="color: {cor_dominante}; font-size: 2rem;">{percentual_dominante:.1f}%</div>
+            <div class="metric-label">Dominante</div>
             <div class="metric-status">
                 <div class="status-indicator" style="background: {cor_dominante};"></div>
-                <span style="color: {cor_dominante};">{fonte_dominante[0]}</span>
+                <span style="color: {cor_dominante}; font-size: 0.8rem;">{fonte_dominante[0]}</span>
             </div>
         </div>
         """, unsafe_allow_html=True)
     
     with col_stat3:
-        capacidade_disponivel = margem + total_carga
-        fator_capacidade = (total_geracao / capacidade_disponivel * 100) if capacidade_disponivel > 0 else 0
+        margem = total_geracao - total_carga
+        margem_color = "#10B981" if margem > 1000 else "#F59E0B" if margem > 0 else "#EF4444"
         st.markdown(f"""
         <div class="metric-card">
-            <div class="metric-value" style="color: #8B5CF6;">{fator_capacidade:.1f}%</div>
-            <div class="metric-label">Fator de Capacidade</div>
+            <div class="metric-value" style="color: {margem_color}; font-size: 2rem;">{margem:,.0f}</div>
+            <div class="metric-label">Reserva (MW)</div>
             <div class="metric-status">
-                <div class="status-indicator status-good" style="background: #8B5CF6;"></div>
-                <span style="color: #8B5CF6;">Em Operação</span>
+                <div class="status-indicator" style="background: {margem_color};"></div>
+                <span style="color: {margem_color}; font-size: 0.8rem;">{"Segura" if margem > 1000 else "Atenção" if margem > 0 else "Crítica"}</span>
             </div>
         </div>
         """, unsafe_allow_html=True)
@@ -822,13 +903,6 @@ else:
     </div>
     """, unsafe_allow_html=True)
 
-# Checkbox de atualização automática com design premium
-st.markdown("""
-<div style="margin-top: 32px; text-align: center;">
-""", unsafe_allow_html=True)
-
-if st.checkbox("🔄 Atualização Automática", value=False, help="Atualiza os dados automaticamente a cada 30 segundos"):
-    time.sleep(30)
-    st.rerun()
-
-st.markdown("</div>", unsafe_allow_html=True)
+# Atualização automática a cada 30 segundos
+time.sleep(30)
+st.rerun()
