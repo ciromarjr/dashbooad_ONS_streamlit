@@ -1,47 +1,4 @@
-# Carregar dados com loading elegante e tratamento de erros
-with st.spinner('🔄 Sincronizando dados em tempo real...'):
-    try:
-        dataframes = load_data()
-        carga_data = get_carga_data()
-        fonte_totals, timeline_data = process_data(dataframes)
-        frequencia_data = get_frequencia_sin()
-        
-        # Verificar se os dados foram carregados corretamente
-        if not fonte_totals:
-            st.warning("⚠️ Alguns dados não estão disponíveis. Usando valores padrão.")
-            fonte_totals = {
-                'Hidráulica': 0,
-                'Eólica': 0,
-                'Solar': 0,
-                'Térmica': 0,
-                'Nuclear': 0
-            }
-            
-    except Exception as e:
-        st.error(f"Erro ao carregar dados: {e}")
-        fonte_totals = {}
-        timeline_data = {}
-        carga_data = pd.DataFrame()
-        frequencia_data = pd.DataFrame()
-
-# Configurar auto-refresh em background usando session state
-if 'last_refresh' not in st.session_state:
-    st.session_state.last_refresh = datetime.now()
-
-# Auto-refresh inteligente sem recarregar página
-current_time = datetime.now()
-if (current_time - st.session_state.last_refresh).total_seconds() > 30:
-    st.session_state.last_refresh = current_time
-    # Limpar cache para forçar nova busca de dados
-    get_data.clear()
-    get_carga_data.clear()
-    get_frequencia_sin.clear()
-    st.rerun()
-
-# Placeholder para atualizações em tempo real
-data_container = st.empty()
-
-with data_container.container():import streamlit as st
+import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
@@ -173,7 +130,38 @@ def calcular_variacao_horaria(df, coluna='geracao'):
         }
     except Exception:
         return {"variacao_media": 0, "pico_hora": "N/A", "vale_hora": "N/A", "maior_variacao": 0}
+# Carregar dados com loading elegante e tratamento de erros
+@st.fragment(run_every=30)
+def load_and_display_dashboard():
+    with st.spinner('🔄 Sincronizando dados em tempo real...'):
+        try:
+            dataframes = load_data()
+            carga_data = get_carga_data()
+            fonte_totals, timeline_data = process_data(dataframes)
+            frequencia_data = get_frequencia_sin()
+            
+            # Verificar se os dados foram carregados corretamente
+            if not fonte_totals:
+                st.warning("⚠️ Alguns dados não estão disponíveis. Usando valores padrão.")
+                fonte_totals = {
+                    'Hidráulica': 0,
+                    'Eólica': 0,
+                    'Solar': 0,
+                    'Térmica': 0,
+                    'Nuclear': 0
+                }
+                
+        except Exception as e:
+            st.error(f"Erro ao carregar dados: {e}")
+            fonte_totals = {}
+            timeline_data = {}
+            carga_data = pd.DataFrame()
+            frequencia_data = pd.DataFrame()
 
+        return fonte_totals, timeline_data, carga_data, frequencia_data
+
+# Executar carregamento de dados
+fonte_totals, timeline_data, carga_data, frequencia_data = load_and_display_dashboard()
 def calcular_tendencia_avancada(df, janela=10):
     """Calcular tendência mais detalhada com variação percentual"""
     if len(df) < janela or len(df) == 0:
