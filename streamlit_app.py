@@ -130,38 +130,7 @@ def calcular_variacao_horaria(df, coluna='geracao'):
         }
     except Exception:
         return {"variacao_media": 0, "pico_hora": "N/A", "vale_hora": "N/A", "maior_variacao": 0}
-# Carregar dados com loading elegante e tratamento de erros
-@st.fragment(run_every=30)
-def load_and_display_dashboard():
-    with st.spinner('🔄 Sincronizando dados em tempo real...'):
-        try:
-            dataframes = load_data()
-            carga_data = get_carga_data()
-            fonte_totals, timeline_data = process_data(dataframes)
-            frequencia_data = get_frequencia_sin()
-            
-            # Verificar se os dados foram carregados corretamente
-            if not fonte_totals:
-                st.warning("⚠️ Alguns dados não estão disponíveis. Usando valores padrão.")
-                fonte_totals = {
-                    'Hidráulica': 0,
-                    'Eólica': 0,
-                    'Solar': 0,
-                    'Térmica': 0,
-                    'Nuclear': 0
-                }
-                
-        except Exception as e:
-            st.error(f"Erro ao carregar dados: {e}")
-            fonte_totals = {}
-            timeline_data = {}
-            carga_data = pd.DataFrame()
-            frequencia_data = pd.DataFrame()
 
-        return fonte_totals, timeline_data, carga_data, frequencia_data
-
-# Executar carregamento de dados
-fonte_totals, timeline_data, carga_data, frequencia_data = load_and_display_dashboard()
 def calcular_tendencia_avancada(df, janela=10):
     """Calcular tendência mais detalhada com variação percentual"""
     if len(df) < janela or len(df) == 0:
@@ -295,7 +264,7 @@ def process_data(dataframes):
     
     return fonte_totals, timeline_data
 
-# CSS Dark Mode para TV com auto-refresh suave
+# CSS Dark Mode para TV
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
@@ -319,19 +288,6 @@ st.markdown("""
         max-width: none !important;
         width: 100vw;
         margin: 0;
-    }
-    
-    /* Auto-refresh suave */
-    .metric-card, .source-card {
-        transition: all 0.5s ease-in-out;
-    }
-    
-    .metric-value {
-        transition: color 0.3s ease, transform 0.3s ease;
-    }
-    
-    .metric-value:hover {
-        transform: scale(1.02);
     }
     
     .metric-card {
@@ -528,45 +484,64 @@ st.markdown("""
     #MainMenu { display: none !important; }
     header { display: none !important; }
 </style>
-
-<script>
-// Auto-refresh em background sem recarregar a página
-setInterval(function() {
-    // Trigger do Streamlit para atualizar dados em background
-    window.parent.postMessage({type: 'streamlit:componentReady'}, '*');
-}, 30000); // 30 segundos
-</script>
 """, unsafe_allow_html=True)
 
-# Carregar dados com loading elegante
-with st.spinner('🔄 Sincronizando dados em tempo real...'):
+# Carregar dados simples
+try:
     dataframes = load_data()
     carga_data = get_carga_data()
     fonte_totals, timeline_data = process_data(dataframes)
     frequencia_data = get_frequencia_sin()
+    
+    # Verificar se os dados foram carregados
+    if not fonte_totals:
+        fonte_totals = {'Hidráulica': 0, 'Eólica': 0, 'Solar': 0, 'Térmica': 0, 'Nuclear': 0}
+        
+except Exception as e:
+    st.error(f"Erro ao carregar dados: {e}")
+    fonte_totals = {}
+    timeline_data = {}
+    carga_data = pd.DataFrame()
+    frequencia_data = pd.DataFrame()
 
 # Layout principal
 if fonte_totals and not carga_data.empty:
-    # Métricas principais
-    total_geracao = sum(fonte_totals.values())
-    total_carga = carga_data['carga'].iloc[-1] if 'carga' in carga_data else 0
-    renovaveis = (fonte_totals.get('Hidráulica', 0) + fonte_totals.get('Eólica', 0) + fonte_totals.get('Solar', 0))
+    # Métricas principais com tratamento seguro de NaN
+    total_geracao = sum(v for v in fonte_totals.values() if not pd.isna(v) and v > 0)
+    total_carga = carga_data['carga'].iloc[-1] if len(carga_data) > 0 and not pd.isna(carga_data['carga'].iloc[-1]) else 0
+    renovaveis = sum([
+        fonte_totals.get('Hidráulica', 0),
+        fonte_totals.get('Eólica', 0),
+        fonte_totals.get('Solar', 0)
+    ])
     percentual_renovavel = (renovaveis / total_geracao * 100) if total_geracao > 0 else 0
     
-    # Calcular análises avançadas
-    trend_carga = calcular_tendencia_avancada(carga_data)
-    variacao_carga = calcular_variacao_horaria(carga_data, 'carga')
+    # Verificar se os valores são válidos
+    if pd.isna(percentual_renovavel):
+        percentual_renovavel = 0
+    
+    # Calcular análises avançadas com tratamento de erros
+    try:
+        trend_carga = calcular_tendencia_avancada(carga_data)
+        variacao_carga = calcular_variacao_horaria(carga_data, 'carga')
+    except:
+        trend_carga = {"coef": 0, "tipo": "stable", "variacao_pct": 0, "variacao_absoluta": 0}
+        variacao_carga = {"pico_hora": "N/A", "vale_hora": "N/A"}
     
     # Calcular tendência total de geração
     if timeline_data:
-        primeira_fonte = list(timeline_data.keys())[0]
-        df_total_temp = pd.DataFrame({'instante': timeline_data[primeira_fonte]['instante']})
-        df_total_temp['geracao'] = sum(timeline_data[fonte]['geracao'] for fonte in timeline_data.keys())
-        trend_geracao = calcular_tendencia_avancada(df_total_temp)
-        variacao_geracao = calcular_variacao_horaria(df_total_temp, 'geracao')
+        try:
+            primeira_fonte = list(timeline_data.keys())[0]
+            df_total_temp = pd.DataFrame({'instante': timeline_data[primeira_fonte]['instante']})
+            df_total_temp['geracao'] = sum(timeline_data[fonte]['geracao'] for fonte in timeline_data.keys())
+            trend_geracao = calcular_tendencia_avancada(df_total_temp)
+            variacao_geracao = calcular_variacao_horaria(df_total_temp, 'geracao')
+        except:
+            trend_geracao = {"coef": 0, "tipo": "stable", "variacao_pct": 0, "variacao_absoluta": 0}
+            variacao_geracao = {"pico_hora": "N/A", "vale_hora": "N/A"}
     else:
         trend_geracao = {"coef": 0, "tipo": "stable", "variacao_pct": 0, "variacao_absoluta": 0}
-        variacao_geracao = {"variacao_media": 0, "pico_hora": "N/A", "vale_hora": "N/A"}
+        variacao_geracao = {"pico_hora": "N/A", "vale_hora": "N/A"}
     
     # Cards de métricas principais expandidos
     col1, col2, col3, col4 = st.columns(4)
@@ -574,6 +549,9 @@ if fonte_totals and not carga_data.empty:
     with col1:
         trend_color = "#34D399" if trend_geracao["tipo"] == "up" else "#F87171" if trend_geracao["tipo"] == "down" else "#FBBF24"
         trend_icon = "↗" if trend_geracao["tipo"] == "up" else "↘" if trend_geracao["tipo"] == "down" else "→"
+        variacao_pct = trend_geracao.get("variacao_pct", 0)
+        if pd.isna(variacao_pct):
+            variacao_pct = 0
         st.markdown(f"""
         <div class="metric-card">
             <div class="metric-value">{total_geracao:,.0f}</div>
@@ -581,7 +559,7 @@ if fonte_totals and not carga_data.empty:
             <div class="metric-status">
                 <div class="status-indicator" style="background: {trend_color};"></div>
                 <span style="color: {trend_color}; font-size: 0.9rem;">
-                    {trend_icon} {trend_geracao["variacao_pct"]:+.1f}% • Pico: {variacao_geracao.get("pico_hora", "N/A")}
+                    {trend_icon} {variacao_pct:+.1f}% • Pico: {variacao_geracao.get("pico_hora", "N/A")}
                 </span>
             </div>
         </div>
@@ -590,6 +568,9 @@ if fonte_totals and not carga_data.empty:
     with col2:
         trend_color = "#34D399" if trend_carga["tipo"] == "stable" else "#FBBF24" if trend_carga["tipo"] == "up" else "#F87171"
         trend_icon = "→" if trend_carga["tipo"] == "stable" else "↗" if trend_carga["tipo"] == "up" else "↘"
+        variacao_pct_carga = trend_carga.get("variacao_pct", 0)
+        if pd.isna(variacao_pct_carga):
+            variacao_pct_carga = 0
         st.markdown(f"""
         <div class="metric-card">
             <div class="metric-value">{total_carga:,.0f}</div>
@@ -597,7 +578,7 @@ if fonte_totals and not carga_data.empty:
             <div class="metric-status">
                 <div class="status-indicator" style="background: {trend_color};"></div>
                 <span style="color: {trend_color}; font-size: 0.9rem;">
-                    {trend_icon} {trend_carga["variacao_pct"]:+.1f}% • Pico: {variacao_carga.get("pico_hora", "N/A")}
+                    {trend_icon} {variacao_pct_carga:+.1f}% • Pico: {variacao_carga.get("pico_hora", "N/A")}
                 </span>
             </div>
         </div>
@@ -620,10 +601,18 @@ if fonte_totals and not carga_data.empty:
     
     with col4:
         # Card de Frequência do SIN - MAIOR e mais visível
-        freq_atual = frequencia_data['frequencia'].iloc[-1] if not frequencia_data.empty else 60.0
-        freq_trend = calcular_tendencia_avancada(frequencia_data)
+        freq_atual = frequencia_data['frequencia'].iloc[-1] if not frequencia_data.empty and not pd.isna(frequencia_data['frequencia'].iloc[-1]) else 60.0
+        try:
+            freq_trend = calcular_tendencia_avancada(frequencia_data)
+        except:
+            freq_trend = {"variacao_pct": 0}
+        
         freq_color = "#34D399" if 59.9 <= freq_atual <= 60.1 else "#FBBF24" if 59.5 <= freq_atual <= 60.5 else "#F87171"
         freq_status = "Normal" if 59.9 <= freq_atual <= 60.1 else "Atenção" if 59.5 <= freq_atual <= 60.5 else "Crítico"
+        
+        freq_var_pct = freq_trend.get("variacao_pct", 0)
+        if pd.isna(freq_var_pct):
+            freq_var_pct = 0
         
         st.markdown(f"""
         <div class="metric-card" style="border: 2px solid {freq_color}; background: linear-gradient(135deg, #252B3A 0%, #2A3441 100%);">
@@ -632,7 +621,7 @@ if fonte_totals and not carga_data.empty:
             <div class="metric-status">
                 <div class="status-indicator" style="background: {freq_color}; width: 16px; height: 16px;"></div>
                 <span style="color: {freq_color}; font-size: 1rem; font-weight: 600;">
-                    {freq_status} • {freq_trend["variacao_pct"]:+.3f}%
+                    {freq_status} • {freq_var_pct:+.3f}%
                 </span>
             </div>
         </div>
@@ -652,18 +641,28 @@ if fonte_totals and not carga_data.empty:
             if valor > 0:
                 # Calcular tendência da fonte com análise detalhada
                 if fonte in timeline_data:
-                    trend_fonte = calcular_tendencia_avancada(timeline_data[fonte])
-                    variacao_fonte = calcular_variacao_horaria(timeline_data[fonte], 'geracao')
-                    trend_icon = "↗" if trend_fonte["tipo"] == "up" else "↘" if trend_fonte["tipo"] == "down" else "→"
-                    trend_class = f"trend-{trend_fonte['tipo']}"
+                    try:
+                        trend_fonte = calcular_tendencia_avancada(timeline_data[fonte])
+                        variacao_fonte = calcular_variacao_horaria(timeline_data[fonte], 'geracao')
+                        trend_icon = "↗" if trend_fonte["tipo"] == "up" else "↘" if trend_fonte["tipo"] == "down" else "→"
+                        trend_class = f"trend-{trend_fonte['tipo']}"
+                    except:
+                        trend_fonte = {"variacao_pct": 0}
+                        variacao_fonte = {"pico_hora": "N/A"}
+                        trend_icon = "→"
+                        trend_class = "trend-stable"
                 else:
-                    trend_fonte = {"coef": 0, "tipo": "stable", "variacao_pct": 0}
-                    variacao_fonte = {"pico_hora": "N/A", "vale_hora": "N/A"}
+                    trend_fonte = {"variacao_pct": 0}
+                    variacao_fonte = {"pico_hora": "N/A"}
                     trend_icon = "→"
                     trend_class = "trend-stable"
                 
-                percentual = (valor / total_geracao * 100)
+                percentual = (valor / total_geracao * 100) if total_geracao > 0 else 0
                 source_color = ENERGY_COLORS.get(fonte, '#94A3B8')
+                
+                variacao_pct_fonte = trend_fonte.get("variacao_pct", 0)
+                if pd.isna(variacao_pct_fonte):
+                    variacao_pct_fonte = 0
                 
                 st.markdown(f"""
                 <div class="source-card" style="--source-color: {source_color};">
@@ -674,7 +673,7 @@ if fonte_totals and not carga_data.empty:
                     <div style="text-align: right;">
                         <div class="source-value" style="color: {source_color}; font-size: 1.1rem;">{valor:,.0f}</div>
                         <div class="trend-badge {trend_class}" style="font-size: 0.65rem;">
-                            {trend_icon} {trend_fonte["variacao_pct"]:+.1f}%
+                            {trend_icon} {variacao_pct_fonte:+.1f}%
                         </div>
                     </div>
                 </div>
@@ -808,15 +807,16 @@ if fonte_totals and not carga_data.empty:
         """, unsafe_allow_html=True)
         
         # Fonte dominante
-        fonte_dominante = max(fonte_totals.items(), key=lambda x: x[1])
-        percentual_dominante = (fonte_dominante[1] / total_geracao * 100)
-        cor_dominante = ENERGY_COLORS.get(fonte_dominante[0], '#94A3B8')
-        st.markdown(f"""
-        <div class="metric-card" style="height: 100px; padding: 12px;">
-            <div class="metric-value" style="color: {cor_dominante}; font-size: 1.5rem;">{percentual_dominante:.1f}%</div>
-            <div class="metric-label" style="font-size: 0.7rem;">{fonte_dominante[0]}</div>
-        </div>
-        """, unsafe_allow_html=True)
+        if fonte_totals:
+            fonte_dominante = max(fonte_totals.items(), key=lambda x: x[1])
+            percentual_dominante = (fonte_dominante[1] / total_geracao * 100) if total_geracao > 0 else 0
+            cor_dominante = ENERGY_COLORS.get(fonte_dominante[0], '#94A3B8')
+            st.markdown(f"""
+            <div class="metric-card" style="height: 100px; padding: 12px;">
+                <div class="metric-value" style="color: {cor_dominante}; font-size: 1.5rem;">{percentual_dominante:.1f}%</div>
+                <div class="metric-label" style="font-size: 0.7rem;">{fonte_dominante[0]}</div>
+            </div>
+            """, unsafe_allow_html=True)
         
         # Reserva
         margem = total_geracao - total_carga
@@ -836,6 +836,8 @@ if fonte_totals and not carga_data.empty:
     with col_analise1:
         # Variação de Carga nas últimas horas
         variacao_absoluta_carga = trend_carga.get("variacao_absoluta", 0)
+        if pd.isna(variacao_absoluta_carga):
+            variacao_absoluta_carga = 0
         variacao_color = "#34D399" if abs(variacao_absoluta_carga) < 500 else "#FBBF24" if abs(variacao_absoluta_carga) < 1000 else "#F87171"
         st.markdown(f"""
         <div class="metric-card" style="height: 140px;">
@@ -852,6 +854,8 @@ if fonte_totals and not carga_data.empty:
     with col_analise2:
         # Variação de Geração
         variacao_absoluta_geracao = trend_geracao.get("variacao_absoluta", 0)
+        if pd.isna(variacao_absoluta_geracao):
+            variacao_absoluta_geracao = 0
         variacao_ger_color = "#34D399" if variacao_absoluta_geracao > 0 else "#F87171" if variacao_absoluta_geracao < -200 else "#FBBF24"
         st.markdown(f"""
         <div class="metric-card" style="height: 140px;">
@@ -869,11 +873,16 @@ if fonte_totals and not carga_data.empty:
         # Maior Fonte em Crescimento
         maior_crescimento = 0
         fonte_crescimento = "Estável"
-        for fonte in timeline_data:
-            trend_f = calcular_tendencia_avancada(timeline_data[fonte])
-            if trend_f["variacao_pct"] > maior_crescimento:
-                maior_crescimento = trend_f["variacao_pct"]
-                fonte_crescimento = fonte
+        if timeline_data:
+            for fonte in timeline_data:
+                try:
+                    trend_f = calcular_tendencia_avancada(timeline_data[fonte])
+                    variacao_pct_f = trend_f.get("variacao_pct", 0)
+                    if not pd.isna(variacao_pct_f) and variacao_pct_f > maior_crescimento:
+                        maior_crescimento = variacao_pct_f
+                        fonte_crescimento = fonte
+                except:
+                    continue
         
         cor_crescimento = ENERGY_COLORS.get(fonte_crescimento, '#34D399')
         st.markdown(f"""
@@ -892,6 +901,8 @@ if fonte_totals and not carga_data.empty:
         # Reserva Operativa
         margem = total_geracao - total_carga
         reserva_pct = (margem / total_carga * 100) if total_carga > 0 else 0
+        if pd.isna(reserva_pct):
+            reserva_pct = 0
         reserva_color = "#34D399" if reserva_pct > 5 else "#FBBF24" if reserva_pct > 2 else "#F87171"
         st.markdown(f"""
         <div class="metric-card" style="height: 140px;">
@@ -934,7 +945,7 @@ else:
         <div class="metric-value" style="color: #F87171;">Dados Indisponíveis</div>
         <div class="metric-label" style="margin-top: 16px;">
             Não foi possível conectar com os servidores do ONS.<br>
-            Tentando reconectar automaticamente...
+            Aguardando próxima atualização automática...
         </div>
         <div class="metric-status" style="margin-top: 24px; justify-content: center;">
             <div class="status-indicator" style="background: #F87171;"></div>
@@ -943,6 +954,6 @@ else:
     </div>
     """, unsafe_allow_html=True)
 
-# Atualização automática a cada 30 segundos
+# Auto-refresh a cada 30 segundos
 time.sleep(30)
 st.rerun()
