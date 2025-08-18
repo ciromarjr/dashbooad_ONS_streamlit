@@ -1,4 +1,47 @@
-import streamlit as st
+# Carregar dados com loading elegante e tratamento de erros
+with st.spinner('🔄 Sincronizando dados em tempo real...'):
+    try:
+        dataframes = load_data()
+        carga_data = get_carga_data()
+        fonte_totals, timeline_data = process_data(dataframes)
+        frequencia_data = get_frequencia_sin()
+        
+        # Verificar se os dados foram carregados corretamente
+        if not fonte_totals:
+            st.warning("⚠️ Alguns dados não estão disponíveis. Usando valores padrão.")
+            fonte_totals = {
+                'Hidráulica': 0,
+                'Eólica': 0,
+                'Solar': 0,
+                'Térmica': 0,
+                'Nuclear': 0
+            }
+            
+    except Exception as e:
+        st.error(f"Erro ao carregar dados: {e}")
+        fonte_totals = {}
+        timeline_data = {}
+        carga_data = pd.DataFrame()
+        frequencia_data = pd.DataFrame()
+
+# Configurar auto-refresh em background usando session state
+if 'last_refresh' not in st.session_state:
+    st.session_state.last_refresh = datetime.now()
+
+# Auto-refresh inteligente sem recarregar página
+current_time = datetime.now()
+if (current_time - st.session_state.last_refresh).total_seconds() > 30:
+    st.session_state.last_refresh = current_time
+    # Limpar cache para forçar nova busca de dados
+    get_data.clear()
+    get_carga_data.clear()
+    get_frequencia_sin.clear()
+    st.rerun()
+
+# Placeholder para atualizações em tempo real
+data_container = st.empty()
+
+with data_container.container():import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
@@ -39,7 +82,7 @@ ENERGY_COLORS = {
     'Carga': '#EC4899'          # Pink 400
 }
 
-# Funções de obtenção de dados expandidas
+# Funções de obtenção de dados expandidas com tratamento de NaN
 @st.cache_data(ttl=20)
 def get_data(url):
     try:
@@ -51,6 +94,11 @@ def get_data(url):
                 if not df.empty:
                     df['instante'] = pd.to_datetime(df['instante'], errors='coerce')
                     df = df.dropna(subset=['instante'])
+                    # Tratar valores NaN na coluna geracao
+                    if 'geracao' in df.columns:
+                        df['geracao'] = pd.to_numeric(df['geracao'], errors='coerce')
+                        df['geracao'] = df['geracao'].fillna(0)  # Substituir NaN por 0
+                        df = df[df['geracao'] >= 0]  # Remover valores negativos
                     return df
         return pd.DataFrame(columns=['instante', 'geracao'])
     except Exception:
@@ -65,6 +113,11 @@ def get_carga_data():
             data = response.json()
             df = pd.DataFrame(data)
             df['instante'] = pd.to_datetime(df['instante'])
+            # Tratar valores NaN na coluna carga
+            if 'carga' in df.columns:
+                df['carga'] = pd.to_numeric(df['carga'], errors='coerce')
+                df['carga'] = df['carga'].fillna(method='ffill')  # Forward fill para NaN
+                df = df.dropna(subset=['carga'])  # Remover linhas ainda com NaN
             return df
         return pd.DataFrame(columns=['instante', 'carga'])
     except Exception:
@@ -79,6 +132,12 @@ def get_frequencia_sin():
             data = response.json()
             df = pd.DataFrame(data)
             df['instante'] = pd.to_datetime(df['instante'])
+            # Tratar valores NaN na frequência
+            if 'frequencia' in df.columns:
+                df['frequencia'] = pd.to_numeric(df['frequencia'], errors='coerce')
+                df['frequencia'] = df['frequencia'].fillna(60.0)  # Usar 60Hz como padrão
+                # Filtrar valores anômalos de frequência
+                df = df[(df['frequencia'] >= 58.0) & (df['frequencia'] <= 62.0)]
             return df
         return pd.DataFrame(columns=['instante', 'frequencia'])
     except Exception:
@@ -127,6 +186,13 @@ def calcular_tendencia_avancada(df, janela=10):
         return {"coef": 0, "tipo": "stable", "variacao_pct": 0, "variacao_absoluta": 0}
     
     try:
+        # Remover valores NaN e infinitos
+        valores_recentes = valores_recentes[~np.isnan(valores_recentes)]
+        valores_recentes = valores_recentes[np.isfinite(valores_recentes)]
+        
+        if len(valores_recentes) < 2:
+            return {"coef": 0, "tipo": "stable", "variacao_pct": 0, "variacao_absoluta": 0}
+        
         x = np.arange(len(valores_recentes))
         coef = np.polyfit(x, valores_recentes, 1)[0]
         
@@ -135,6 +201,14 @@ def calcular_tendencia_avancada(df, janela=10):
         valor_final = valores_recentes[-1]
         variacao_absoluta = valor_final - valor_inicial
         variacao_pct = (variacao_absoluta / valor_inicial * 100) if valor_inicial != 0 else 0
+        
+        # Verificar se os valores são válidos
+        if np.isnan(variacao_pct) or np.isinf(variacao_pct):
+            variacao_pct = 0
+        if np.isnan(variacao_absoluta) or np.isinf(variacao_absoluta):
+            variacao_absoluta = 0
+        if np.isnan(coef) or np.isinf(coef):
+            coef = 0
         
         if coef > 5:
             tipo = "up"
@@ -203,10 +277,16 @@ def process_data(dataframes):
         if df.empty:
             continue
         fonte = key.split(' - ')[0]
+        valor_atual = df['geracao'].iloc[-1] if len(df) > 0 else 0
+        
+        # Verificar se o valor é válido
+        if pd.isna(valor_atual) or np.isinf(valor_atual) or valor_atual < 0:
+            valor_atual = 0
+            
         if fonte not in fonte_totals:
-            fonte_totals[fonte] = df['geracao'].iloc[-1]
+            fonte_totals[fonte] = valor_atual
         else:
-            fonte_totals[fonte] += df['geracao'].iloc[-1]
+            fonte_totals[fonte] += valor_atual
     
     # Preparar dados para gráfico de 24h
     timeline_data = {}
@@ -217,11 +297,17 @@ def process_data(dataframes):
         if fonte not in timeline_data:
             timeline_data[fonte] = df.copy()
         else:
-            timeline_data[fonte]['geracao'] += df['geracao']
+            # Verificar se os dados podem ser somados
+            if len(timeline_data[fonte]) == len(df):
+                timeline_data[fonte]['geracao'] += df['geracao']
+            else:
+                # Se os tamanhos forem diferentes, usar o maior dataset
+                if len(df) > len(timeline_data[fonte]):
+                    timeline_data[fonte] = df.copy()
     
     return fonte_totals, timeline_data
 
-# CSS Dark Mode para TV
+# CSS Dark Mode para TV com auto-refresh suave
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
@@ -245,6 +331,19 @@ st.markdown("""
         max-width: none !important;
         width: 100vw;
         margin: 0;
+    }
+    
+    /* Auto-refresh suave */
+    .metric-card, .source-card {
+        transition: all 0.5s ease-in-out;
+    }
+    
+    .metric-value {
+        transition: color 0.3s ease, transform 0.3s ease;
+    }
+    
+    .metric-value:hover {
+        transform: scale(1.02);
     }
     
     .metric-card {
@@ -441,6 +540,14 @@ st.markdown("""
     #MainMenu { display: none !important; }
     header { display: none !important; }
 </style>
+
+<script>
+// Auto-refresh em background sem recarregar a página
+setInterval(function() {
+    // Trigger do Streamlit para atualizar dados em background
+    window.parent.postMessage({type: 'streamlit:componentReady'}, '*');
+}, 30000); // 30 segundos
+</script>
 """, unsafe_allow_html=True)
 
 # Carregar dados com loading elegante
