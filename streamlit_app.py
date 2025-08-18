@@ -71,15 +71,6 @@ def get_carga_data():
         return pd.DataFrame(columns=['instante', 'carga'])
 
 @st.cache_data(ttl=20)
-def get_balanco_energetico():
-    url = "https://integra.ons.org.br/api/energiaagora/GetBalancoEnergetico/null"
-    try:
-        response = requests.get(url, timeout=5)
-        return response.json() if response.status_code == 200 else None
-    except Exception:
-        return None
-
-@st.cache_data(ttl=20)
 def get_frequencia_sin():
     url = "https://integra.ons.org.br/api/energiaagora/Get/Frequencia_SIN_json"
     try:
@@ -92,36 +83,6 @@ def get_frequencia_sin():
         return pd.DataFrame(columns=['instante', 'frequencia'])
     except Exception:
         return pd.DataFrame(columns=['instante', 'frequencia'])
-
-@st.cache_data(ttl=20)
-def get_carga_verificada():
-    """Obter histórico de carga verificada do SIN"""
-    url = "https://integra.ons.org.br/api/energiaagora/Get/CargaVerificada_SIN_json"
-    try:
-        response = requests.get(url, timeout=5)
-        if response.status_code == 200:
-            data = response.json()
-            df = pd.DataFrame(data)
-            df['instante'] = pd.to_datetime(df['instante'])
-            return df
-        return pd.DataFrame(columns=['instante', 'carga'])
-    except Exception:
-        return pd.DataFrame(columns=['instante', 'carga'])
-
-@st.cache_data(ttl=20)
-def get_geracao_programada():
-    """Obter geração programada"""
-    url = "https://integra.ons.org.br/api/energiaagora/Get/GeracaoProgramada_SIN_json"
-    try:
-        response = requests.get(url, timeout=5)
-        if response.status_code == 200:
-            data = response.json()
-            df = pd.DataFrame(data)
-            df['instante'] = pd.to_datetime(df['instante'])
-            return df
-        return pd.DataFrame(columns=['instante', 'geracao'])
-    except Exception:
-        return pd.DataFrame(columns=['instante', 'geracao'])
 
 def calcular_variacao_horaria(df, coluna='geracao'):
     """Calcular variação horária e identificar picos/vales"""
@@ -260,7 +221,7 @@ def process_data(dataframes):
     
     return fonte_totals, timeline_data
 
-# CSS Dark Mode Premium
+# CSS Dark Mode para TV
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
@@ -286,7 +247,6 @@ st.markdown("""
         margin: 0;
     }
     
-    /* TV Widescreen adjustments */
     .metric-card {
         background: linear-gradient(135deg, #252B3A 0%, #2A3441 100%);
         border: 1px solid #3B4252;
@@ -321,157 +281,6 @@ st.markdown("""
         margin-bottom: 8px;
     }
     
-    .source-card {
-        background: linear-gradient(135deg, #252B3A 0%, #2A3441 100%);
-        border: 1px solid #3B4252;
-        border-radius: 12px;
-        padding: 16px;
-        margin: 4px 0;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        position: relative;
-        overflow: hidden;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-        min-height: 70px;
-    }
-    
-    .section-title {
-        font-size: 1.3rem;
-        font-weight: 800;
-        color: #F8FAFC;
-        margin-bottom: 16px;
-        position: relative;
-        padding-left: 16px;
-    }
-    
-    /* Compact layout for TV */
-    .chart-container {
-        background: linear-gradient(135deg, #252B3A 0%, #2A3441 100%);
-        border: 1px solid #3B4252;
-        border-radius: 20px;
-        padding: 20px;
-        margin: 10px 0;
-        box-shadow: 0 12px 30px rgba(0, 0, 0, 0.3);
-        position: relative;
-        overflow: hidden;
-    }
-    
-    .footer {
-        background: linear-gradient(135deg, #252B3A 0%, #2A3441 100%);
-        border: 1px solid #3B4252;
-        border-radius: 16px;
-        padding: 16px 24px;
-        margin-top: 20px;
-        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
-    }
-    
-    .footer-content {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        color: #94A3B8;
-        font-size: 0.8rem;
-    }
-    
-    .hero-header {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        padding: 48px 32px;
-        border-radius: 24px;
-        margin-bottom: 40px;
-        text-align: center;
-        position: relative;
-        overflow: hidden;
-        box-shadow: 0 25px 50px rgba(0, 0, 0, 0.4);
-    }
-    
-    .hero-header::before {
-        content: '';
-        position: absolute;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background: linear-gradient(45deg, transparent 30%, rgba(255,255,255,0.1) 50%, transparent 70%);
-        animation: shimmer 3s infinite;
-    }
-    
-    @keyframes shimmer {
-        0% { transform: translateX(-100%); }
-        100% { transform: translateX(100%); }
-    }
-    
-    .hero-title {
-        font-size: 3.5rem;
-        font-weight: 800;
-        margin: 0;
-        color: white;
-        text-shadow: 0 4px 8px rgba(0,0,0,0.3);
-        position: relative;
-        z-index: 1;
-    }
-    
-    .hero-subtitle {
-        font-size: 1.25rem;
-        margin: 16px 0 0 0;
-        color: rgba(255,255,255,0.9);
-        position: relative;
-        z-index: 1;
-    }
-    
-    .metric-card {
-        background: linear-gradient(135deg, #252B3A 0%, #2A3441 100%);
-        border: 1px solid #3B4252;
-        border-radius: 20px;
-        padding: 32px;
-        margin: 12px 0;
-        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        position: relative;
-        overflow: hidden;
-        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
-    }
-    
-    .metric-card::before {
-        content: '';
-        position: absolute;
-        top: 0;
-        left: 0;
-        right: 0;
-        height: 3px;
-        background: linear-gradient(90deg, #3B82F6, #10B981, #F59E0B, #EF4444, #8B5CF6);
-        opacity: 0;
-        transition: opacity 0.3s ease;
-    }
-    
-    .metric-card:hover {
-        transform: translateY(-8px);
-        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
-        border-color: #4C566A;
-    }
-    
-    .metric-card:hover::before {
-        opacity: 1;
-    }
-    
-    .metric-value {
-        font-size: 3rem;
-        font-weight: 800;
-        color: #F8FAFC;
-        margin-bottom: 8px;
-        line-height: 1;
-        text-shadow: 0 2px 4px rgba(0,0,0,0.3);
-    }
-    
-    .metric-label {
-        font-size: 0.875rem;
-        color: #94A3B8;
-        font-weight: 600;
-        text-transform: uppercase;
-        letter-spacing: 0.1em;
-        margin-bottom: 12px;
-    }
-    
     .metric-status {
         display: flex;
         align-items: center;
@@ -493,16 +302,12 @@ st.markdown("""
         50% { opacity: 0.7; }
     }
     
-    .status-good { color: #10B981; }
-    .status-warning { color: #F59E0B; }
-    .status-critical { color: #EF4444; }
-    
     .source-card {
         background: linear-gradient(135deg, #252B3A 0%, #2A3441 100%);
         border: 1px solid #3B4252;
-        border-radius: 16px;
-        padding: 24px;
-        margin: 8px 0;
+        border-radius: 12px;
+        padding: 16px;
+        margin: 4px 0;
         display: flex;
         align-items: center;
         justify-content: space-between;
@@ -510,6 +315,7 @@ st.markdown("""
         position: relative;
         overflow: hidden;
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        min-height: 70px;
     }
     
     .source-card::before {
@@ -536,7 +342,6 @@ st.markdown("""
     .source-name {
         font-weight: 700;
         color: #F8FAFC;
-        font-size: 1.1rem;
     }
     
     .source-percentage {
@@ -546,7 +351,6 @@ st.markdown("""
     }
     
     .source-value {
-        font-size: 1.5rem;
         font-weight: 800;
         color: var(--source-color);
         text-shadow: 0 2px 4px rgba(0,0,0,0.3);
@@ -556,7 +360,6 @@ st.markdown("""
         background: rgba(255, 255, 255, 0.1);
         border-radius: 12px;
         padding: 4px 12px;
-        font-size: 0.75rem;
         font-weight: 600;
         margin-top: 8px;
         display: inline-block;
@@ -564,48 +367,25 @@ st.markdown("""
     }
     
     .trend-up { 
-        color: #10B981; 
-        background: rgba(16, 185, 129, 0.1);
-        box-shadow: 0 0 20px rgba(16, 185, 129, 0.3);
+        color: #34D399; 
+        background: rgba(52, 211, 153, 0.1);
     }
     .trend-down { 
-        color: #EF4444; 
-        background: rgba(239, 68, 68, 0.1);
-        box-shadow: 0 0 20px rgba(239, 68, 68, 0.3);
+        color: #F87171; 
+        background: rgba(248, 113, 113, 0.1);
     }
     .trend-stable { 
-        color: #94A3B8; 
-        background: rgba(148, 163, 184, 0.1);
-    }
-    
-    .chart-container {
-        background: linear-gradient(135deg, #252B3A 0%, #2A3441 100%);
-        border: 1px solid #3B4252;
-        border-radius: 24px;
-        padding: 32px;
-        margin: 20px 0;
-        box-shadow: 0 15px 35px rgba(0, 0, 0, 0.3);
-        position: relative;
-        overflow: hidden;
-    }
-    
-    .chart-container::before {
-        content: '';
-        position: absolute;
-        top: 0;
-        left: 0;
-        right: 0;
-        height: 2px;
-        background: linear-gradient(90deg, #3B82F6, #10B981, #F59E0B);
+        color: #FBBF24; 
+        background: rgba(251, 191, 36, 0.1);
     }
     
     .section-title {
-        font-size: 1.5rem;
+        font-size: 1.3rem;
         font-weight: 800;
         color: #F8FAFC;
-        margin-bottom: 24px;
+        margin-bottom: 16px;
         position: relative;
-        padding-left: 20px;
+        padding-left: 16px;
     }
     
     .section-title::before {
@@ -620,19 +400,13 @@ st.markdown("""
         border-radius: 2px;
     }
     
-    .glass-effect {
-        background: rgba(255, 255, 255, 0.05);
-        backdrop-filter: blur(20px);
-        border: 1px solid rgba(255, 255, 255, 0.1);
-    }
-    
     .footer {
         background: linear-gradient(135deg, #252B3A 0%, #2A3441 100%);
         border: 1px solid #3B4252;
-        border-radius: 20px;
-        padding: 32px;
-        margin-top: 48px;
-        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+        border-radius: 16px;
+        padding: 16px 24px;
+        margin-top: 20px;
+        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
     }
     
     .footer-content {
@@ -640,7 +414,7 @@ st.markdown("""
         justify-content: space-between;
         align-items: center;
         color: #94A3B8;
-        font-size: 0.875rem;
+        font-size: 0.8rem;
     }
     
     .live-indicator {
@@ -662,49 +436,10 @@ st.markdown("""
         box-shadow: 0 0 10px #34D399;
     }
     
-    .block-container {
-        padding-top: 1rem;
-        padding-bottom: 1rem;
-        max-width: none;
-        padding-left: 1rem;
-        padding-right: 1rem;
-    }
-    
-    .stPlotlyChart {
-        border-radius: 16px;
-        overflow: hidden;
-    }
-    
-    /* Hide Streamlit elements */
     footer { display: none !important; }
     .stDeployButton { display: none !important; }
     #MainMenu { display: none !important; }
     header { display: none !important; }
-    
-    /* Custom scrollbar */
-    ::-webkit-scrollbar {
-        width: 8px;
-    }
-    
-    ::-webkit-scrollbar-track {
-        background: #1A1F2E;
-    }
-    
-    ::-webkit-scrollbar-thumb {
-        background: linear-gradient(135deg, #3B82F6, #8B5CF6);
-        border-radius: 4px;
-    }
-    
-    ::-webkit-scrollbar-thumb:hover {
-        background: linear-gradient(135deg, #2563EB, #7C3AED);
-    }
-    
-    /* Responsive */
-    @media (max-width: 768px) {
-        .hero-title { font-size: 2.5rem; }
-        .metric-value { font-size: 2rem; }
-        .source-value { font-size: 1.25rem; }
-    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -713,12 +448,7 @@ with st.spinner('🔄 Sincronizando dados em tempo real...'):
     dataframes = load_data()
     carga_data = get_carga_data()
     fonte_totals, timeline_data = process_data(dataframes)
-    
-    # Novos dados para análise avançada
     frequencia_data = get_frequencia_sin()
-    balanco_data = get_balanco_energetico()
-    carga_verificada = get_carga_verificada()
-    geracao_programada = get_geracao_programada()
 
 # Layout principal
 if fonte_totals and not carga_data.empty:
@@ -727,39 +457,58 @@ if fonte_totals and not carga_data.empty:
     total_carga = carga_data['carga'].iloc[-1] if 'carga' in carga_data else 0
     renovaveis = (fonte_totals.get('Hidráulica', 0) + fonte_totals.get('Eólica', 0) + fonte_totals.get('Solar', 0))
     percentual_renovavel = (renovaveis / total_geracao * 100) if total_geracao > 0 else 0
-    margem = total_geracao - total_carga
     
-    # Cards de métricas principais com design premium
-    col1, col2, col3 = st.columns(3)
+    # Calcular análises avançadas
+    trend_carga = calcular_tendencia_avancada(carga_data)
+    variacao_carga = calcular_variacao_horaria(carga_data, 'carga')
+    
+    # Calcular tendência total de geração
+    if timeline_data:
+        primeira_fonte = list(timeline_data.keys())[0]
+        df_total_temp = pd.DataFrame({'instante': timeline_data[primeira_fonte]['instante']})
+        df_total_temp['geracao'] = sum(timeline_data[fonte]['geracao'] for fonte in timeline_data.keys())
+        trend_geracao = calcular_tendencia_avancada(df_total_temp)
+        variacao_geracao = calcular_variacao_horaria(df_total_temp, 'geracao')
+    else:
+        trend_geracao = {"coef": 0, "tipo": "stable", "variacao_pct": 0, "variacao_absoluta": 0}
+        variacao_geracao = {"variacao_media": 0, "pico_hora": "N/A", "vale_hora": "N/A"}
+    
+    # Cards de métricas principais expandidos
+    col1, col2, col3, col4 = st.columns(4)
     
     with col1:
+        trend_color = "#34D399" if trend_geracao["tipo"] == "up" else "#F87171" if trend_geracao["tipo"] == "down" else "#FBBF24"
+        trend_icon = "↗" if trend_geracao["tipo"] == "up" else "↘" if trend_geracao["tipo"] == "down" else "→"
         st.markdown(f"""
         <div class="metric-card">
             <div class="metric-value">{total_geracao:,.0f}</div>
             <div class="metric-label">Geração Total (MW)</div>
             <div class="metric-status">
-                <div class="status-indicator status-good" style="background: #10B981;"></div>
-                <span style="color: #10B981;">Sistema Operacional</span>
+                <div class="status-indicator" style="background: {trend_color};"></div>
+                <span style="color: {trend_color}; font-size: 0.9rem;">
+                    {trend_icon} {trend_geracao["variacao_pct"]:+.1f}% • Pico: {variacao_geracao.get("pico_hora", "N/A")}
+                </span>
             </div>
         </div>
         """, unsafe_allow_html=True)
     
     with col2:
-        trend_carga, tipo_trend_carga = calcular_tendencia(carga_data)
-        trend_color = "#34D399" if tipo_trend_carga == "stable" else "#FBBF24" if tipo_trend_carga == "up" else "#F87171"
+        trend_color = "#34D399" if trend_carga["tipo"] == "stable" else "#FBBF24" if trend_carga["tipo"] == "up" else "#F87171"
+        trend_icon = "→" if trend_carga["tipo"] == "stable" else "↗" if trend_carga["tipo"] == "up" else "↘"
         st.markdown(f"""
         <div class="metric-card">
             <div class="metric-value">{total_carga:,.0f}</div>
             <div class="metric-label">Carga Total (MW)</div>
             <div class="metric-status">
                 <div class="status-indicator" style="background: {trend_color};"></div>
-                <span style="color: {trend_color};">{"Estável" if tipo_trend_carga == "stable" else "Crescendo" if tipo_trend_carga == "up" else "Reduzindo"}</span>
+                <span style="color: {trend_color}; font-size: 0.9rem;">
+                    {trend_icon} {trend_carga["variacao_pct"]:+.1f}% • Pico: {variacao_carga.get("pico_hora", "N/A")}
+                </span>
             </div>
         </div>
         """, unsafe_allow_html=True)
     
     with col3:
-        renovavel_status = "good" if percentual_renovavel > 70 else "warning" if percentual_renovavel > 50 else "critical"
         renovavel_color = "#34D399" if percentual_renovavel > 70 else "#FBBF24" if percentual_renovavel > 50 else "#F87171"
         st.markdown(f"""
         <div class="metric-card">
@@ -767,11 +516,33 @@ if fonte_totals and not carga_data.empty:
             <div class="metric-label">Energia Renovável</div>
             <div class="metric-status">
                 <div class="status-indicator" style="background: {renovavel_color};"></div>
-                <span style="color: {renovavel_color};">{"Matriz Limpa" if percentual_renovavel > 70 else "Moderada" if percentual_renovavel > 50 else "Crítica"}</span>
+                <span style="color: {renovavel_color}; font-size: 0.9rem;">
+                    {"Matriz Limpa" if percentual_renovavel > 70 else "Moderada" if percentual_renovavel > 50 else "Crítica"}
+                </span>
             </div>
         </div>
         """, unsafe_allow_html=True)
     
+    with col4:
+        # Card de Frequência do SIN - MAIOR e mais visível
+        freq_atual = frequencia_data['frequencia'].iloc[-1] if not frequencia_data.empty else 60.0
+        freq_trend = calcular_tendencia_avancada(frequencia_data)
+        freq_color = "#34D399" if 59.9 <= freq_atual <= 60.1 else "#FBBF24" if 59.5 <= freq_atual <= 60.5 else "#F87171"
+        freq_status = "Normal" if 59.9 <= freq_atual <= 60.1 else "Atenção" if 59.5 <= freq_atual <= 60.5 else "Crítico"
+        
+        st.markdown(f"""
+        <div class="metric-card" style="border: 2px solid {freq_color}; background: linear-gradient(135deg, #252B3A 0%, #2A3441 100%);">
+            <div class="metric-value" style="font-size: 3rem; color: {freq_color};">{freq_atual:.2f}</div>
+            <div class="metric-label" style="font-size: 1rem; font-weight: 700;">FREQUÊNCIA SIN (Hz)</div>
+            <div class="metric-status">
+                <div class="status-indicator" style="background: {freq_color}; width: 16px; height: 16px;"></div>
+                <span style="color: {freq_color}; font-size: 1rem; font-weight: 600;">
+                    {freq_status} • {freq_trend["variacao_pct"]:+.3f}%
+                </span>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
     # Layout em 3 colunas para otimizar espaço na TV
     col_left, col_center, col_right = st.columns([1, 2, 1])
     
@@ -851,7 +622,7 @@ if fonte_totals and not carga_data.empty:
             ))
             
             fig_gen_load.update_layout(
-                height=500,  # Reduzido para caber na tela
+                height=500,
                 margin=dict(t=10, b=50, l=20, r=20),
                 paper_bgcolor='rgba(0,0,0,0)',
                 plot_bgcolor='rgba(37, 43, 58, 0.3)',
@@ -920,7 +691,7 @@ if fonte_totals and not carga_data.empty:
         )
         
         fig_pie.update_layout(
-            height=220,  # Bem compacto
+            height=220,
             margin=dict(t=5, b=5, l=5, r=5),
             paper_bgcolor='rgba(0,0,0,0)',
             plot_bgcolor='rgba(0,0,0,0)',
@@ -946,16 +717,6 @@ if fonte_totals and not carga_data.empty:
         percentual_dominante = (fonte_dominante[1] / total_geracao * 100)
         cor_dominante = ENERGY_COLORS.get(fonte_dominante[0], '#94A3B8')
         st.markdown(f"""
-        <div class="metric-card" style="height: 120px;">
-            <div class="metric-value" style="color: {cor_dominante}; font-size: 1.8rem;">{percentual_dominante:.1f}%</div>
-            <div class="metric-label">Fonte Dominante</div>
-            <div class="metric-status">
-                <div class="status-indicator" style="background: {cor_dominante};"></div>
-                <span style="color: {cor_dominante}; font-size: 0.8rem;">{fonte_dominante[0]}</span>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)')
-        st.markdown(f"""
         <div class="metric-card" style="height: 100px; padding: 12px;">
             <div class="metric-value" style="color: {cor_dominante}; font-size: 1.5rem;">{percentual_dominante:.1f}%</div>
             <div class="metric-label" style="font-size: 0.7rem;">{fonte_dominante[0]}</div>
@@ -971,7 +732,7 @@ if fonte_totals and not carga_data.empty:
             <div class="metric-label" style="font-size: 0.7rem;">Reserva MW</div>
         </div>
         """, unsafe_allow_html=True)
-    
+
     # Cards de análise operacional detalhada
     st.markdown('<div class="section-title" style="margin-top: 16px;">📊 Análise Operacional</div>', unsafe_allow_html=True)
     
@@ -1047,33 +808,9 @@ if fonte_totals and not carga_data.empty:
                 </span>
             </div>
         </div>
-        """, unsafe_allow_html=True)')
-        st.markdown(f"""
-        <div class="metric-card" style="height: 120px;">
-            <div class="metric-value" style="color: {cor_dominante}; font-size: 1.8rem;">{percentual_dominante:.1f}%</div>
-            <div class="metric-label">Fonte Dominante</div>
-            <div class="metric-status">
-                <div class="status-indicator" style="background: {cor_dominante};"></div>
-                <span style="color: {cor_dominante}; font-size: 0.8rem;">{fonte_dominante[0]}</span>
-            </div>
-        </div>
         """, unsafe_allow_html=True)
-    
-    with col_stat3:
-        margem = total_geracao - total_carga
-        margem_color = "#34D399" if margem > 1000 else "#FBBF24" if margem > 0 else "#F87171"
-        st.markdown(f"""
-        <div class="metric-card" style="height: 120px;">
-            <div class="metric-value" style="color: {margem_color}; font-size: 1.8rem;">{margem:,.0f}</div>
-            <div class="metric-label">Reserva (MW)</div>
-            <div class="metric-status">
-                <div class="status-indicator" style="background: {margem_color};"></div>
-                <span style="color: {margem_color}; font-size: 0.8rem;">{"Segura" if margem > 1000 else "Atenção" if margem > 0 else "Crítica"}</span>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    # Footer premium com indicador ao vivo
+
+    # Footer com indicador ao vivo e estatísticas do sistema
     st.markdown(f"""
     <div class="footer">
         <div class="footer-content">
@@ -1081,12 +818,12 @@ if fonte_totals and not carga_data.empty:
                 <strong style="color: #F8FAFC;">Fonte de Dados:</strong> 
                 <span style="color: #94A3B8;">ONS (Operador Nacional do Sistema Elétrico)</span>
                 <br>
-                <strong style="color: #F8FAFC;">Frequência:</strong> 
-                <span style="color: #94A3B8;">Atualização automática a cada 20 segundos</span>
+                <strong style="color: #F8FAFC;">Análise:</strong> 
+                <span style="color: #94A3B8;">Dados do dia atual • Tendências baseadas em {len(carga_data)} pontos</span>
             </div>
             <div class="live-indicator">
                 <div class="live-dot"></div>
-                <span style="color: #10B981; font-weight: 600;">
+                <span style="color: #34D399; font-weight: 600;">
                     AO VIVO • {datetime.now().strftime('%H:%M:%S')}
                 </span>
             </div>
@@ -1099,14 +836,14 @@ else:
     st.markdown("""
     <div class="metric-card" style="text-align: center; padding: 64px;">
         <div style="font-size: 4rem; margin-bottom: 24px;">⚠️</div>
-        <div class="metric-value" style="color: #EF4444;">Dados Indisponíveis</div>
+        <div class="metric-value" style="color: #F87171;">Dados Indisponíveis</div>
         <div class="metric-label" style="margin-top: 16px;">
             Não foi possível conectar com os servidores do ONS.<br>
             Tentando reconectar automaticamente...
         </div>
         <div class="metric-status" style="margin-top: 24px; justify-content: center;">
-            <div class="status-indicator status-critical" style="background: #EF4444;"></div>
-            <span style="color: #EF4444;">Sistema Offline</span>
+            <div class="status-indicator" style="background: #F87171;"></div>
+            <span style="color: #F87171;">Sistema Offline</span>
         </div>
     </div>
     """, unsafe_allow_html=True)
