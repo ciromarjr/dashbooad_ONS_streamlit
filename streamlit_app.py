@@ -946,6 +946,16 @@ if fonte_totals and not carga_data.empty:
         percentual_dominante = (fonte_dominante[1] / total_geracao * 100)
         cor_dominante = ENERGY_COLORS.get(fonte_dominante[0], '#94A3B8')
         st.markdown(f"""
+        <div class="metric-card" style="height: 120px;">
+            <div class="metric-value" style="color: {cor_dominante}; font-size: 1.8rem;">{percentual_dominante:.1f}%</div>
+            <div class="metric-label">Fonte Dominante</div>
+            <div class="metric-status">
+                <div class="status-indicator" style="background: {cor_dominante};"></div>
+                <span style="color: {cor_dominante}; font-size: 0.8rem;">{fonte_dominante[0]}</span>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)')
+        st.markdown(f"""
         <div class="metric-card" style="height: 100px; padding: 12px;">
             <div class="metric-value" style="color: {cor_dominante}; font-size: 1.5rem;">{percentual_dominante:.1f}%</div>
             <div class="metric-label" style="font-size: 0.7rem;">{fonte_dominante[0]}</div>
